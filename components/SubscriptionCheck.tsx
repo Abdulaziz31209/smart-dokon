@@ -196,11 +196,11 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
                   <p className="text-3xl font-black text-emerald-400 mb-1">
                     {plan.price.toLocaleString('uz-UZ')} <span className="text-sm text-slate-400">so'm</span>
                   </p>
-                  {planKey === 'yearly' && plan.total && (
-                    <p className="text-xs text-slate-500 line-through mb-1">
-                      {plan.total.toLocaleString('uz-UZ')} so'm
-                    </p>
-                  )}
+                  {planKey === 'yearly' && 'total' in plan && (
+  <p className="text-xs text-slate-500 line-through mb-1">
+    {Number(plan.total).toLocaleString('uz-UZ')} so'm
+  </p>
+)}
                   <p className="text-sm text-slate-400">{plan.days} kun</p>
                 </button>
               )
