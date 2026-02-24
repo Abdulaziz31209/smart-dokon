@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-
+import { useRouter } from 'next/navigation'
+import SubscriptionCheck from '@//SubscriptionCheck'
 import {
-  Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
-  ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
-  ArrowUpRight, Eye, FileText, Settings, Bell, Clock, Target,
-  RefreshCw, Percent, Zap, Award, LineChart, PieChart, Phone,
-  Mail, LogOut, ChevronDown, CheckCircle2, Save, Loader2,
-  UserPlus, Briefcase, Home, ArrowDownRight, ToggleLeft, ToggleRight,
-  Star, TrendingDown, Hash, CreditCard, Banknote, Globe
+  Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
+  ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
+  ArrowUpRight, Eye, FileText, Settings, Bell, Clock, Target,
+  RefreshCw, Percent, Zap, Award, LineChart, PieChart, Phone,
+  Mail, LogOut, ChevronDown, CheckCircle2, Save, Loader2,
+  UserPlus, Briefcase, Home, ArrowDownRight, ToggleLeft, ToggleRight,
+  Star, TrendingDown, Hash, CreditCard, Banknote, Globe
 } from 'lucide-react'
-import Link from 'next/link'
+import Link from 'next/link' 
 
 // ─── Sonlarni formatlash (hydration-safe) ────────────────────────────────────
 function fmt(n: number): string {
@@ -1690,10 +1691,16 @@ const logout = async () => {
       </Modal>
 
     </div> 
-  )
- // Agar foydalanuvchi kirgan bo'lsa va profil mavjud bo'lsa, obuna tekshiruvini qo'llaymiz
-  
-    
-  }
+  // Agar foydalanuvchi kirgan bo'lsa va profil mavjud bo'lsa, obuna tekshiruvini qo'llaymiz
+         )
+  if (user && profile) {  
+    return (
+      <SubscriptionCheck userId={user.id}>
+        {mainContent}
+      </SubscriptionCheck>
+    )
+  }
 
-  // Demo rejim yoki profil to'liq emas - obuna tekshiruvisiz
+  // Demo rejim yoki profil to'liq emas - obuna tekshiruvisiz
+  return mainContent
+}

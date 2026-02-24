@@ -1,7 +1,13 @@
 'use client'
 import React from 'react'
 
-export default function SubscriptionCheck({ children }: { children: React.ReactNode }) {
-  // Bu kod obuna tekshiruvini butunlay chetlab o'tadi
+// userId xatosini yo'qotish uchun uni interface-ga qo'shdik
+interface Props {
+  children: React.ReactNode;
+  userId?: string; 
+}
+
+export default function SubscriptionCheck({ children }: Props) {
+  // Hech qanday tekshiruvsiz kontentni qaytaramiz
   return <>{children}</>
 }
