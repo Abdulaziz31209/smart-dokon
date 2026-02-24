@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import SubscriptionCheck from '@/components/SubscriptionCheck'
+
 import {
   Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
   ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
@@ -1689,18 +1689,11 @@ const logout = async () => {
         </div>
       </Modal>
 
-    </div>
+    </div> 
   )
-
-  // Agar foydalanuvchi kirgan bo'lsa va profil mavjud bo'lsa, obuna tekshiruvini qo'llaymiz
-  if (user && profile) {
-    return (
-      <SubscriptionCheck userId={user.id}>
-        {mainContent}
-      </SubscriptionCheck>
-    )
+ // Agar foydalanuvchi kirgan bo'lsa va profil mavjud bo'lsa, obuna tekshiruvini qo'llaymiz
+  
+    
   }
 
   // Demo rejim yoki profil to'liq emas - obuna tekshiruvisiz
-  return mainContent
-}
