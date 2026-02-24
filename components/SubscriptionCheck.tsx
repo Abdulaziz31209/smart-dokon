@@ -204,7 +204,7 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
                   <p className="text-sm text-slate-400">{plan.days} kun</p>
                 </button>
               )
-            })}
+            })}   
           </div>
 
           {/* Promo kod */}
