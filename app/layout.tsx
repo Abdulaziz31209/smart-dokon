@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import NavigationProvider from "@/components/NavigationProvider";
-import SubscriptionCheck from "@/components/SubscriptionCheck"; // Faylni import qilish
 import { Suspense } from "react";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -18,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="uz">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#020617] text-white`}>
-        {/* 2. NavigationProvider-ni Suspense bilan o'raymiz */}
+        {/* Auth tekshiruvini layout'dan olib tashladik, 
+            chunki u server-side'da xato berishi oson. 
+            Uni alohida 'Client' komponentda qilib olamiz */}
         <Suspense fallback={<div className="min-h-screen bg-[#020617]" />}>
           <NavigationProvider>
             <Navbar /> 

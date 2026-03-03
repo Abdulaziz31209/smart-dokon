@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import SubscriptionCheck from '@//SubscriptionCheck'
+import SubscriptionCheck from '@/components/SubscriptionCheck'
 import {
   Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
   ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
@@ -1691,16 +1691,20 @@ const logout = async () => {
       </Modal>
 
     </div> 
-  // Agar foydalanuvchi kirgan bo'lsa va profil mavjud bo'lsa, obuna tekshiruvini qo'llaymiz
-         )
-  if (user && profile) {  
-    return (
-      <SubscriptionCheck userId={user.id}>
-        {mainContent}
-      </SubscriptionCheck>
-    )
-  }
-
-  // Demo rejim yoki profil to'liq emas - obuna tekshiruvisiz
-  return mainContent
+  // 1. Agar foydalanuvchi tizimga kirgan bo'lsa va profili mavjud bo'lsa:
+// Obuna tekshiruvi bilan ko'rsatamiz
+        )
+if (user && profile) {
+  return (
+    <SubscriptionCheck userId={user.id}>
+      {mainContent}
+    </SubscriptionCheck>
+  );
 }
+
+// 2. Aks holda (yoki demo rejimda):
+// Obuna tekshiruvisiz asosiy kontentni ko'rsatamiz
+return mainContent;
+}
+
+//  
