@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { X, CreditCard, Calendar, Tag, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface SubscriptionCheckProps {
-  userId: string
+  userId?: string | null // userId endi optional — undefined/null bo'lishi mumkin
   children: React.ReactNode
 }
 
@@ -17,13 +17,15 @@ const SUBSCRIPTION_PLANS = {
 export default function SubscriptionCheck({ userId, children }: SubscriptionCheckProps) {
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null)
   const [subscription, setSubscription] = useState<any>(null)
-  const [showModal, setShowModal] = useState(false)
+  const [showModal, setShowModal] = useState(false) // ishlatilmayapti, lekin saqlab qoldim (legacy)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [promoResult, setPromoResult] = useState<any>(null)
-  console.log("SubscriptionCheck holati:", { loading, hasSubscription, userId, subscription });
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly')
+
+  console.log("SubscriptionCheck holati:", { loading, hasSubscription, userId, subscription });
+  console.log("SubscriptionCheckga kelgan userId:", userId);
 
   useEffect(() => {
     checkSubscription()
@@ -31,9 +33,14 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
 
   const checkSubscription = async () => {
     if (!userId) {
+      setHasSubscription(null)
+      setSubscription(null)
       setLoading(false)
       return
     }
+
+    // userId mavjud bo'lsa — tekshirish jarayonida loader ko'rsatamiz
+    setLoading(true)
 
     try {
       const { data, error } = await supabase.rpc('has_active_subscription', {
@@ -125,7 +132,6 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
 
       if (error) throw error
 
-      // Promo kodni yangilash
       if (promoCode && promoResult?.valid) {
         await supabase.rpc('increment_promo_usage', { p_code: promoCode.trim().toUpperCase() })
       }
@@ -141,6 +147,7 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
     }
   }
 
+  // 1. Loading holati — har doim spinner ko'rsatiladi
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -149,17 +156,48 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
     )
   }
 
-  // Agar obuna mavjud bo'lsa, kontentni ko'rsatamiz
-  if (hasSubscription && subscription) {
-    return <>{children}</>
-  }
-
-  // Agar obuna tekshiruvi xato bo'lsa yoki hali tekshirilmagan bo'lsa, kontentni ko'rsatamiz (demo rejim uchun)
+  // 2. userId yo'q (null/undefined) — "Login qilinmagan" holati
+  //    Bu holatda children hech qachon render bo'lmaydi!
   if (hasSubscription === null) {
+    return (
+      <>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <div className="inline-flex p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 mb-4">
+                <AlertCircle className="w-12 h-12 text-amber-400" />
+              </div>
+              <h1 className="text-3xl font-black text-white mb-2">Login Talab Qilinadi</h1>
+              <p className="text-slate-400 max-w-md mx-auto">
+                Obunani tekshirish va tizimdan foydalanish uchun avval hisobingizga kirishingiz kerak.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                // Sizning loyihangizdagi login sahifasi yo‘liga moslashtiring
+                window.location.href = '/login'
+              }}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-lg shadow-xl transition-all flex items-center justify-center gap-2"
+            >
+              Tizimga Kirish
+            </button>
+
+            <p className="text-xs text-slate-500 text-center mt-6">
+              Kirganingizdan keyin sahifani yangilang (F5)
+            </p>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // 3. Obuna mavjud (true)
+  if (hasSubscription === true) {
     return <>{children}</>
   }
 
-  // Obuna modal
+  // 4. Obuna yo‘q (false) — obuna modal
   return (
     <>
       {/* Bloklangan ekran */}
@@ -198,14 +236,14 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
                     {plan.price.toLocaleString('uz-UZ')} <span className="text-sm text-slate-400">so'm</span>
                   </p>
                   {planKey === 'yearly' && 'total' in plan && (
-  <p className="text-xs text-slate-500 line-through mb-1">
-    {Number(plan.total).toLocaleString('uz-UZ')} so'm
-  </p>
-)}
+                    <p className="text-xs text-slate-500 line-through mb-1">
+                      {Number(plan.total).toLocaleString('uz-UZ')} so'm
+                    </p>
+                  )}
                   <p className="text-sm text-slate-400">{plan.days} kun</p>
                 </button>
               )
-            })}   
+            })}
           </div>
 
           {/* Promo kod */}
