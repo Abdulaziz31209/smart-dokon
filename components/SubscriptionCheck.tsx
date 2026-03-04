@@ -2,31 +2,36 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { X, CreditCard, Calendar, Tag, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, CreditCard, Loader2, Tag } from 'lucide-react'
 
-interface SubscriptionCheckProps {
-  userId?: string | null // userId endi optional — undefined/null bo'lishi mumkin
-  children: React.ReactNode
+// Tipni aniqlab olamiz (bu xatoni yo'qotadi)
+interface Plan {
+  price: number
+  label: string
+  days: number
 }
 
-const SUBSCRIPTION_PLANS = {
+// as const o'rniga aniq tipdan foydalanamiz
+const SUBSCRIPTION_PLANS: Record<'monthly' | 'yearly', Plan> = {
   monthly: { price: 199990, label: '1 oylik', days: 30 },
-  yearly: { price: 149999, label: 'Har oy (yillik)', days: 365, total: 1799988 }
+  yearly: { price: 1499990, label: 'Yillik', days: 365 },
+}
+
+interface SubscriptionCheckProps {
+  userId?: string | null
+  children: React.ReactNode
 }
 
 export default function SubscriptionCheck({ userId, children }: SubscriptionCheckProps) {
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null)
   const [subscription, setSubscription] = useState<any>(null)
-  const [showModal, setShowModal] = useState(false) // ishlatilmayapti, lekin saqlab qoldim (legacy)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [promoResult, setPromoResult] = useState<any>(null)
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly')
 
-  console.log("SubscriptionCheck holati:", { loading, hasSubscription, userId, subscription });
-  console.log("SubscriptionCheckga kelgan userId:", userId);
-
+  // 1. OBUNA TEKSHIRISH
   useEffect(() => {
     checkSubscription()
   }, [userId])
@@ -39,64 +44,58 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
       return
     }
 
-    // userId mavjud bo'lsa — tekshirish jarayonida loader ko'rsatamiz
     setLoading(true)
-
     try {
-      const { data, error } = await supabase.rpc('has_active_subscription', {
-        p_user_id: userId
-      })
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .gte('expires_at', new Date().toISOString())
+        .order('expires_at', { ascending: false })
+        .maybeSingle()
 
       if (error) throw error
-
-      if (data) {
-        const { data: subData } = await supabase.rpc('get_active_subscription', {
-          p_user_id: userId
-        })
-        if (subData && subData.length > 0) {
-          setSubscription(subData[0])
-          setHasSubscription(true)
-        } else {
-          setHasSubscription(false)
-        }
-      } else {
-        setHasSubscription(false)
-      }
+      
+      setSubscription(data)
+      setHasSubscription(!!data)
     } catch (err) {
-      console.error('Subscription check error:', err)
+      console.error('Subscription error:', err)
       setHasSubscription(false)
     } finally {
       setLoading(false)
     }
   }
 
+  // 2. PROMO KOD TEKSHIRISH
   const validatePromoCode = async () => {
-    if (!promoCode.trim()) {
-      setPromoResult(null)
+    const code = promoCode.trim().toUpperCase()
+    if (!code) return
+
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .eq('code', code)
+      .eq('active', true)
+      .maybeSingle()
+
+    if (error || !data) {
+      setPromoResult({ valid: false, message: 'Kod topilmadi' })
       return
     }
 
-    try {
-      const { data, error } = await supabase.rpc('validate_promo_code', {
-        p_code: promoCode.trim().toUpperCase()
-      })
-
-      if (error) throw error
-
-      if (data && data.length > 0 && data[0].valid) {
-        setPromoResult(data[0])
-      } else {
-        setPromoResult({ valid: false, message: data?.[0]?.message || 'Promo kod topilmadi' })
-      }
-    } catch (err: any) {
-      setPromoResult({ valid: false, message: err.message || 'Xatolik yuz berdi' })
+    if (data.max_uses && data.current_uses >= data.max_uses) {
+      setPromoResult({ valid: false, message: 'Limit tugagan' })
+    } else {
+      setPromoResult({ ...data, valid: true, message: 'Kod faol ✓' })
     }
   }
 
+  // 3. OBUNA SOTIB OLISH
   const handleSubscribe = async () => {
     if (!userId) return
-
     setProcessing(true)
+
     try {
       const plan = SUBSCRIPTION_PLANS[selectedPlan]
       let finalAmount = plan.price
@@ -104,16 +103,11 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
       let freeDays = 0
 
       if (promoResult?.valid) {
-        if (promoResult.discount_percent > 0) {
-          discountAmount = (plan.price * promoResult.discount_percent) / 100
-          finalAmount = plan.price - discountAmount
-        } else if (promoResult.discount_amount > 0) {
-          discountAmount = promoResult.discount_amount
-          finalAmount = Math.max(0, plan.price - discountAmount)
-        }
-        if (promoResult.free_days > 0) {
-          freeDays = promoResult.free_days
-        }
+        discountAmount = promoResult.discount_percent 
+          ? (plan.price * promoResult.discount_percent) / 100 
+          : (promoResult.discount_amount || 0)
+        finalAmount = Math.max(0, plan.price - discountAmount)
+        freeDays = promoResult.free_days || 0
       }
 
       const expiresAt = new Date()
@@ -123,8 +117,6 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
         user_id: userId,
         plan_type: selectedPlan,
         amount: plan.price,
-        promo_code: promoCode.trim().toUpperCase() || null,
-        discount_amount: discountAmount,
         final_amount: finalAmount,
         expires_at: expiresAt.toISOString(),
         is_active: true
@@ -132,14 +124,14 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
 
       if (error) throw error
 
-      if (promoCode && promoResult?.valid) {
-        await supabase.rpc('increment_promo_usage', { p_code: promoCode.trim().toUpperCase() })
+      if (promoResult?.valid) {
+        await supabase
+          .from('promo_codes')
+          .update({ current_uses: (promoResult.current_uses || 0) + 1 })
+          .eq('code', promoCode.trim().toUpperCase())
       }
 
       await checkSubscription()
-      setShowModal(false)
-      setPromoCode('')
-      setPromoResult(null)
     } catch (err: any) {
       alert('Xatolik: ' + err.message)
     } finally {
@@ -147,196 +139,37 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
     }
   }
 
-  // 1. Loading holati — har doim spinner ko'rsatiladi
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-      </div>
-    )
-  }
+  // RENDER QISMI
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-blue-500" /></div>
 
-  // 2. userId yo'q (null/undefined) — "Login qilinmagan" holati
-  //    Bu holatda children hech qachon render bo'lmaydi!
-  if (hasSubscription === null) {
-    return (
-      <>
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-2xl">
-            <div className="text-center mb-8">
-              <div className="inline-flex p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 mb-4">
-                <AlertCircle className="w-12 h-12 text-amber-400" />
-              </div>
-              <h1 className="text-3xl font-black text-white mb-2">Login Talab Qilinadi</h1>
-              <p className="text-slate-400 max-w-md mx-auto">
-                Obunani tekshirish va tizimdan foydalanish uchun avval hisobingizga kirishingiz kerak.
-              </p>
-            </div>
+  if (hasSubscription === true) return <>{children}</>
 
-            <button
-              onClick={() => {
-                // Sizning loyihangizdagi login sahifasi yo‘liga moslashtiring
-                window.location.href = '/login'
-              }}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-lg shadow-xl transition-all flex items-center justify-center gap-2"
-            >
-              Tizimga Kirish
-            </button>
-
-            <p className="text-xs text-slate-500 text-center mt-6">
-              Kirganingizdan keyin sahifani yangilang (F5)
-            </p>
-          </div>
-        </div>
-      </>
-    )
-  }
-
-  // 3. Obuna mavjud (true)
-  if (hasSubscription === true) {
-    return <>{children}</>
-  }
-
-  // 4. Obuna yo‘q (false) — obuna modal
   return (
-    <>
-      {/* Bloklangan ekran */}
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-2xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex p-4 bg-red-500/10 rounded-2xl border border-red-500/20 mb-4">
-              <AlertCircle className="w-12 h-12 text-red-400" />
-            </div>
-            <h1 className="text-3xl font-black text-white mb-2">Obuna Talab Qilinadi</h1>
-            <p className="text-slate-400">
-              Tizimdan foydalanish uchun obuna bo'lishingiz kerak
-            </p>
-          </div>
-
-          {/* Obuna rejalari */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {(['monthly', 'yearly'] as const).map((planKey) => {
-              const plan = SUBSCRIPTION_PLANS[planKey]
-              const isSelected = selectedPlan === planKey
-              return (
-                <button
-                  key={planKey}
-                  onClick={() => setSelectedPlan(planKey)}
-                  className={`p-6 rounded-2xl border-2 transition-all text-left ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 bg-slate-900/50 hover:border-slate-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-white font-bold text-lg">{plan.label}</h3>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 text-blue-400" />}
-                  </div>
-                  <p className="text-3xl font-black text-emerald-400 mb-1">
-                    {plan.price.toLocaleString('uz-UZ')} <span className="text-sm text-slate-400">so'm</span>
-                  </p>
-                  {planKey === 'yearly' && 'total' in plan && (
-                    <p className="text-xs text-slate-500 line-through mb-1">
-                      {Number(plan.total).toLocaleString('uz-UZ')} so'm
-                    </p>
-                  )}
-                  <p className="text-sm text-slate-400">{plan.days} kun</p>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Promo kod */}
-          <div className="mb-6">
-            <label className="text-sm font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Promo kod (ixtiyoriy)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="PROMO2026"
-                value={promoCode}
-                onChange={(e) => {
-                  setPromoCode(e.target.value.toUpperCase())
-                  setPromoResult(null)
-                }}
-                onBlur={validatePromoCode}
-                className="flex-1 px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm uppercase"
-              />
-              <button
-                onClick={validatePromoCode}
-                className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold text-sm transition-all"
-              >
-                Tekshirish
-              </button>
-            </div>
-            {promoResult && (
-              <p className={`text-xs mt-2 ${promoResult.valid ? 'text-emerald-400' : 'text-red-400'}`}>
-                {promoResult.valid ? '✓ ' + promoResult.message : '✗ ' + promoResult.message}
-              </p>
-            )}
-          </div>
-
-          {/* Jami */}
-          <div className="bg-slate-900/50 rounded-xl p-4 mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-slate-400">Narx:</span>
-              <span className="text-white font-bold">
-                {SUBSCRIPTION_PLANS[selectedPlan].price.toLocaleString('uz-UZ')} so'm
-              </span>
-            </div>
-            {promoResult?.valid && promoResult.discount_amount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-400">Chegirma:</span>
-                <span className="text-emerald-400 font-bold">
-                  -{promoResult.discount_amount.toLocaleString('uz-UZ')} so'm
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between items-center pt-2 border-t border-slate-700">
-              <span className="text-white font-bold">Jami:</span>
-              <span className="text-emerald-400 font-black text-xl">
-                {(() => {
-                  const plan = SUBSCRIPTION_PLANS[selectedPlan]
-                  let final = plan.price
-                  if (promoResult?.valid) {
-                    if (promoResult.discount_percent > 0) {
-                      final = plan.price - (plan.price * promoResult.discount_percent) / 100
-                    } else if (promoResult.discount_amount > 0) {
-                      final = Math.max(0, plan.price - promoResult.discount_amount)
-                    }
-                  }
-                  return final.toLocaleString('uz-UZ')
-                })()} so'm
-              </span>
-            </div>
-          </div>
-
-          {/* To'lov tugmasi */}
-          <button
-            onClick={handleSubscribe}
-            disabled={processing}
-            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black rounded-xl text-lg shadow-xl shadow-emerald-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {processing ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                To'lanmoqda...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5" />
-                Obuna Bo'lish
-              </>
-            )}
-          </button>
-
-          <p className="text-xs text-slate-500 text-center mt-4">
-            To'lov amalga oshirilgandan so'ng, obuna avtomatik faollashtiriladi
-          </p>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full bg-slate-800 border border-slate-700 rounded-3xl p-8">
+        <h1 className="text-3xl font-black text-white text-center mb-8">Obuna bo‘lish</h1>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          {(['monthly', 'yearly'] as const).map((key) => (
+            <button key={key} onClick={() => setSelectedPlan(key)} 
+              className={`p-6 rounded-2xl border-2 ${selectedPlan === key ? 'border-blue-500 bg-blue-950' : 'border-slate-700'}`}>
+              <div className="font-bold text-white">{SUBSCRIPTION_PLANS[key].label}</div>
+              <div className="text-emerald-400 font-black">{SUBSCRIPTION_PLANS[key].price.toLocaleString()} so‘m</div>
+            </button>
+          ))}
         </div>
+
+        <div className="flex gap-2 mb-6">
+          <input className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white uppercase" 
+            placeholder="PROMO KOD" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} />
+          <button onClick={validatePromoCode} className="px-6 bg-slate-700 rounded-xl text-white">Tekshir</button>
+        </div>
+
+        <button onClick={handleSubscribe} disabled={processing} 
+          className="w-full py-4 bg-emerald-600 rounded-xl text-white font-bold">
+          {processing ? '...' : 'Obuna bo‘lish'}
+        </button>
       </div>
-    </>
+    </div>
   )
 }
