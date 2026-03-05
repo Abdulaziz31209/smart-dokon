@@ -100,30 +100,19 @@ export default function LoginPage() {
       }
 
       const inputUN  = username.trim().toLowerCase().replace(/^@/, '')
-      const storedUN = profile.username?.toLowerCase?.() ?? ''
+      const storedUN = (profile.username ?? '').toLowerCase()
       if (inputUN !== storedUN) {
         await supabase.auth.signOut()
         throw new Error("USERNAME xato! Ro'yxatdan o'tishda berilgan kodni kiriting.")
       }
-
       if (profile.is_active === false) {
         await supabase.auth.signOut()
         throw new Error("Hisobingiz o'chirilgan. Administrator bilan bog'laning.")
       }
 
-      // Onboarding kerakmi? (majburiy maydonlarni tekshirish)
-      const needsOnboarding = !profile.full_name || 
-        !profile.phone || 
-        !profile.birth_date || 
-        !profile.shop_name || 
-        !profile.shop_type
-      
+      const needsOnboarding = !profile.full_name || !profile.phone || !profile.birth_date || !profile.shop_name || !profile.shop_type
       resetLoginMeta(); setAttempts(0); setSuccess(true)
-      
-      // Onboarding kerak bo'lsa, onboarding sahifasiga, aks holda bosh sahifaga
-      setTimeout(() => { 
-        window.location.href = needsOnboarding ? '/onboarding' : '/' 
-      }, 1200)
+      setTimeout(() => { window.location.href = needsOnboarding ? '/onboarding' : '/' }, 1200)
     } catch (err: any) {
       const meta = getLoginMeta()
       const newAttempts = meta.attempts + 1
@@ -158,8 +147,6 @@ export default function LoginPage() {
         </div>
         <span className="text-white font-black tracking-tight text-lg">Smart-Dokon</span>
       </div>
-
-      {/* Top-right: Signup link */}
       <div className="absolute top-6 right-6 z-10">
         <Link href="/auth/signup"
           className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-lg transition-all active:scale-95">
@@ -191,7 +178,7 @@ export default function LoginPage() {
 
           <div className="px-8 py-7">
 
-            {/* Muvaffaqiyat holati */}
+            {/* Muvaffaqiyat */}
             {success && (
               <div className="flex flex-col items-center py-6 gap-4">
                 <div className="w-16 h-16 bg-emerald-500/15 border-2 border-emerald-500/30 rounded-full flex items-center justify-center">
@@ -202,7 +189,7 @@ export default function LoginPage() {
                   <p className="text-slate-400 text-sm mt-1">Yuklanmoqda...</p>
                 </div>
                 <div className="flex gap-1">
-                  {[0, 1, 2].map(i => (
+                  {[0,1,2].map(i => (
                     <div key={i} className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"
                       style={{ animationDelay: `${i * 0.15}s` }} />
                   ))}
@@ -210,7 +197,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Bloklangan holat */}
+            {/* Bloklangan */}
             {!success && isLocked && (
               <div className="flex flex-col items-center py-6 gap-4">
                 <div className="w-16 h-16 bg-red-500/15 border-2 border-red-500/30 rounded-full flex items-center justify-center">
@@ -226,7 +213,6 @@ export default function LoginPage() {
                     {Math.floor(countdown / 60).toString().padStart(2, '0')}:{(countdown % 60).toString().padStart(2, '0')}
                   </p>
                 </div>
-                <p className="text-slate-500 text-xs text-center">Agar bu siz bo'lmasangiz, administratorga xabar bering</p>
               </div>
             )}
 
@@ -276,8 +262,8 @@ export default function LoginPage() {
                       onChange={e => { setUsername(e.target.value); setTUser(true); setError('') }}
                       onBlur={() => setTUser(true)} />
                   </div>
-                  {tUser && !vUser && <p className="text-red-400 text-xs ml-0.5">Kamida 3 ta belgi bo'lishi kerak</p>}
-                  <p className="text-slate-600 text-xs ml-0.5">Ro'yxatdan o'tishda berilgan username — parol kabi muhim!</p>
+                  {tUser && !vUser && <p className="text-red-400 text-xs">Kamida 3 ta belgi bo'lishi kerak</p>}
+                  <p className="text-slate-600 text-xs">Ro'yxatdan o'tishda berilgan username — parol kabi muhim!</p>
                 </div>
 
                 {/* Email */}
@@ -299,7 +285,7 @@ export default function LoginPage() {
                       onChange={e => { setEmail(e.target.value); setTEmail(true); setError('') }}
                       onBlur={() => setTEmail(true)} />
                   </div>
-                  {tEmail && !vEmail && <p className="text-red-400 text-xs ml-0.5">To'g'ri email kiriting</p>}
+                  {tEmail && !vEmail && <p className="text-red-400 text-xs">To'g'ri email kiriting</p>}
                 </div>
 
                 {/* Parol */}
@@ -327,16 +313,16 @@ export default function LoginPage() {
                       onChange={e => { setPassword(e.target.value); setTPwd(true); setError('') }}
                       onBlur={() => setTPwd(true)} />
                   </div>
-                  {tPwd && !vPwd && <p className="text-red-400 text-xs ml-0.5">Parol kamida 6 ta belgi</p>}
+                  {tPwd && !vPwd && <p className="text-red-400 text-xs">Parol kamida 6 ta belgi</p>}
                 </div>
 
                 {/* 3 qatlamli himoya */}
                 <div className="p-3.5 bg-slate-800/40 border border-slate-700/40 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2.5">
                     <ShieldCheck className="w-4 h-4 text-blue-400" />
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">3 Qatlamli Himoya</span>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {[
                       { label: 'Email + Parol', done: vEmail && vPwd, desc: 'Supabase Auth' },
                       { label: 'Username',      done: vUser,          desc: 'DB taqqoslash' },
@@ -360,34 +346,6 @@ export default function LoginPage() {
                   {loading
                     ? <><Loader2 className="w-4 h-4 animate-spin" />Tekshirilmoqda...</>
                     : <><ArrowRight className="w-4 h-4" />TIZIMGA KIRISH</>}
-                </button>
-
-                <div className="flex items-center gap-3 py-1">
-                  <div className="flex-1 h-px bg-slate-800" />
-                  <span className="text-slate-600 text-xs font-bold uppercase tracking-wider">yoki</span>
-                  <div className="flex-1 h-px bg-slate-800" />
-                </div>
-
-                <button type="button" disabled={loading}
-                  onClick={async () => {
-                    setError(''); setLoading(true)
-                    const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-                      provider: 'google',
-                      options: {
-                        redirectTo: `${window.location.origin}/auth/callback`,
-                        queryParams: { access_type: 'offline', prompt: 'consent' },
-                      }
-                    })
-                    if (oauthErr) { setError('Google orqali kirishda xatolik: ' + oauthErr.message); setLoading(false) }
-                  }}
-                  className="w-full flex items-center justify-center gap-3 border border-slate-700 hover:border-slate-500 hover:bg-slate-800/50 py-3 rounded-xl transition-all font-semibold text-slate-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Google orqali kirish
                 </button>
               </form>
             )}
