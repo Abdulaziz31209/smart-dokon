@@ -17,39 +17,43 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const bot = new Bot(BOT_TOKEN);
 
 bot.command("start", async (ctx) => {
-  const userIdFromUrl = ctx.match; // Saytdan kelgan ID (UUID)
+  const userIdFromUrl = ctx.match; // Saytdan kelgan ID
 
-  if (userIdFromUrl) {
+  // 1. UUID formatini tekshirish (8-4-4-4-12 ko'rinishida bo'lishi shart)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromUrl);
+
+  if (userIdFromUrl && isUUID) {
     try {
-      // 1. 6 xonali tasodifiy kod yaratish
+      // 2. 6 xonali tasodifiy kod yaratish
       const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-      // 2. Bazani yangilash (ID, Username va 6 xonali kodni saqlash)
-      // DIQQAT: 'verification_code' ustuni bazangizda bo'lishi kerak
+      // 3. Bazani yangilash
       const { error } = await supabase
         .from("profiles")
         .update({ 
           telegram_id: ctx.from?.id.toString(), 
           telegram_username: ctx.from?.username || "noma'lum",
-          verification_code: generatedCode // Kodni bazaga yozamiz
+          verification_code: generatedCode 
         })
-        .eq("id", userIdFromUrl);
+        .eq("id", userIdFromUrl); // Endi bu yerda UUID xatosi chiqmaydi
 
       if (error) throw error;
 
-      // 3. Foydalanuvchiga xabar yuborish
-      await ctx.reply(`✅ Akkauntingiz bog'landi!\n\nSizning tasdiqlash kodingiz: **${generatedCode}**`, { parse_mode: "Markdown" });
+      // 4. Foydalanuvchiga xabar yuborish
+      await ctx.reply(`✅ Akkauntingiz muvaffaqiyatli bog'landi!\n\nSizning tasdiqlash kodingiz: **${generatedCode}**`, { parse_mode: "Markdown" });
       
       console.log(`✅ Kod yuborildi: ${generatedCode} (User: ${userIdFromUrl})`);
 
-    } catch (err) {
-      console.error("Supabase xatosi:", err);
-      await ctx.reply("⚠️ Bazaga yozishda xato. Ustunlar to'g'riligini tekshiring.");
+    } catch (err: any) {
+      console.error("Supabase xatosi:", err.message);
+      await ctx.reply("⚠️ Bazaga yozishda xato yuz berdi. Iltimos, keyinroq urinib ko'ring.");
     }
   } else {
-    await ctx.reply("Salom! Kod olish uchun iltimos saytdagi tugmani bosing.");
+    // Agar UUID bo'lmasa yoki shunchaki raqam kelsa (masalan 244949)
+    await ctx.reply("Salom! Kod olish uchun iltimos saytdagi tugmani bosing.\n\nEslatma: Saytdan kelgan havola noto'g'ri ko'rinishda.");
+    console.log(`⚠️ Noto'g'ri ID formatda keldi: ${userIdFromUrl}`);
   }
 });
 
-console.log("🚀 Bot ishga tushdi va kod yaratishga tayyor...");
+console.log("🚀 Bot ishga tushdi va UUID tekshiruvi yoqildi...");
 bot.start();
