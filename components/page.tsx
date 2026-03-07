@@ -14,10 +14,22 @@ export default function InventoryPage() {
 
   const fetchProducts = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('name')
+    // 1. Avval foydalanuvchini Supabase'dan so'rab olamiz
+const { data: { user } } = await supabase.auth.getUser();
+
+// 2. Foydalanuvchi tizimda bormi yoki yo'qligini tekshiramiz (Guard Clause)
+if (!user) {
+  // Agar user null bo'lsa, kodni shu yerda to'xtatamiz
+  console.log("Foydalanuvchi tizimga kirmagan");
+  return; 
+}
+
+// 3. Endi 'user' borligiga aminmiz, xotirjam 'user.id' ni ishlatamiz
+const { data, error } = await supabase
+  .from('products')
+  .select('*')
+  .eq('user_id', user.id) // Endi TypeScript 'user' ni taniydi!
+  .order('name');
     
     if (error) console.error(error)
     else setProducts(data || [])

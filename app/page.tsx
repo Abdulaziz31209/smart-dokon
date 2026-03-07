@@ -241,13 +241,26 @@ export default function SmartDokon() {
   }
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) { console.error('Error fetching products:', error); return }
-    setProducts(data || [])
+  // 1. Avval foydalanuvchini so'raymiz
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 2. Agar user kirmagan bo'lsa, pastga tushib o'tirmaymiz
+  if (!user) return;
+
+  // 3. Endi faqat shu userga tegishli mahsulotlarni olamiz
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('user_id', user.id) // <--- Mana bu "oltin kalit"
+    .order('created_at', { ascending: false });
+
+  if (error) { 
+    console.error('Error fetching products:', error); 
+    return; 
   }
+
+  setProducts(data || []);
+};
 
   const fetchEmployees = async () => {
     const { data, error } = await supabase

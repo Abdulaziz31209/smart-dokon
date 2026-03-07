@@ -44,12 +44,18 @@ export default function EditProductModal({ product, isOpen, onClose, onUpdate }:
     setLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .update(formData)
-        .eq('id', product.id)
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (error) throw error
+// 2. Agar user bo'lsa, tahrirlaymiz
+if (user) {
+  const { error } = await supabase
+    .from('products')
+    .update(formData)
+    .eq('id', product.id)     // Mahsulotning o'z raqami
+    .eq('user_id', user.id);  // Faqat senga tegishli ekanini tasdiqlash
+
+  if (error) throw error;
+}
 
       onUpdate()
       onClose()
