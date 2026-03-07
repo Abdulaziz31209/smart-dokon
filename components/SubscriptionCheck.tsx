@@ -16,19 +16,60 @@ interface SubscriptionCheckProps {
   children: React.ReactNode
 }
 
+// localStorage cache kaliti
+const CACHE_KEY = 'sub_active'
+const CACHE_EXPIRY_KEY = 'sub_active_until'
+// Cache muddati: 6 soat (ms)
+const CACHE_DURATION_MS = 6 * 60 * 60 * 1000
+
+function getCachedStatus(userId: string): boolean {
+  try {
+    const cachedUserId = localStorage.getItem(CACHE_KEY)
+    const expiryStr    = localStorage.getItem(CACHE_EXPIRY_KEY)
+    if (!cachedUserId || !expiryStr) return false
+    if (cachedUserId !== userId) return false          // boshqa user
+    if (Date.now() > parseInt(expiryStr, 10)) return false // muddati o'tgan
+    return true
+  } catch {
+    return false
+  }
+}
+
+function setCachedStatus(userId: string) {
+  try {
+    localStorage.setItem(CACHE_KEY, userId)
+    localStorage.setItem(CACHE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION_MS))
+  } catch {}
+}
+
+function clearCachedStatus() {
+  try {
+    localStorage.removeItem(CACHE_KEY)
+    localStorage.removeItem(CACHE_EXPIRY_KEY)
+  } catch {}
+}
+
 export default function SubscriptionCheck({ userId, children }: SubscriptionCheckProps) {
-  const [status, setStatus]           = useState<'loading' | 'active' | 'inactive'>('loading')
+  const [status, setStatus]             = useState<'loading' | 'active' | 'inactive'>('loading')
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>('monthly')
-  const [promoCode, setPromoCode]     = useState('')
-  const [promoMsg, setPromoMsg]       = useState<{ ok: boolean; text: string } | null>(null)
-  const [promoData, setPromoData]     = useState<any>(null)
-  const [processing, setProcessing]   = useState(false)
+  const [promoCode, setPromoCode]       = useState('')
+  const [promoMsg, setPromoMsg]         = useState<{ ok: boolean; text: string } | null>(null)
+  const [promoData, setPromoData]       = useState<any>(null)
+  const [processing, setProcessing]     = useState(false)
 
   useEffect(() => { checkSub() }, [userId])
 
   /* ── 1. OBUNA TEKSHIRISH ── */
   async function checkSub() {
     if (!userId) { setStatus('inactive'); return }
+
+    // Avval cache'dan tekshir — sahifa yangilanganda shu ishlaydi
+    if (getCachedStatus(userId)) {
+      setStatus('active')
+      return
+    }
+
+    // Cache yo'q yoki muddati o'tgan — Supabase'dan tekshir
     try {
       const { data } = await supabase
         .from('subscriptions')
@@ -37,8 +78,17 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
         .eq('is_active', true)
         .gte('expires_at', new Date().toISOString())
         .maybeSingle()
-      setStatus(data ? 'active' : 'inactive')
+
+      if (data) {
+        setCachedStatus(userId)   // topildi → cache'ga yoz
+        setStatus('active')
+      } else {
+        clearCachedStatus()
+        setStatus('inactive')
+      }
     } catch {
+      // Supabase xatosi bo'lsa ham foydalanuvchini bloklama
+      // Agar oldin cache bo'lmagan bo'lsa inactive ko'rsat
       setStatus('inactive')
     }
   }
@@ -48,7 +98,6 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
     const code = promoCode.trim().toUpperCase()
     if (!code) return
 
-    /* "FREE" yoki "DEMO" kabi maxsus kodlar — DB ga ulanmasa ham ishlaydi */
     if (code === 'FREE2026' || code === 'DEMO') {
       setPromoData({ type: 'free', free_days: 9999 })
       setPromoMsg({ ok: true, text: 'Bepul kirish faollashtirildi! 🎉' })
@@ -86,23 +135,18 @@ export default function SubscriptionCheck({ userId, children }: SubscriptionChec
     if (!userId) return
     setProcessing(true)
     try {
-      const plan = SUBSCRIPTION_PLANS[selectedPlan]
-      const isFree = promoData?.type === 'free'
-
-      let finalAmount   = plan.price
-      let discountAmount = 0
+      const plan        = SUBSCRIPTION_PLANS[selectedPlan]
+      const isFree      = promoData?.type === 'free'
       const freeDays    = promoData?.free_days ?? 0
 
+      let discountAmount = 0
       if (promoData && !isFree) {
         discountAmount = promoData.discount_percent
           ? Math.round((plan.price * promoData.discount_percent) / 100)
           : (promoData.discount_amount ?? 0)
-type Subscription = {
-  finalAmount: number; 
-}      }
-type Subscription = {
-  finalAmount: number; 
-}
+      }
+      const finalAmount = isFree ? 0 : Math.max(0, plan.price - discountAmount)
+
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + (isFree ? freeDays : plan.days))
 
@@ -118,7 +162,7 @@ type Subscription = {
       })
       if (error) throw error
 
-      /* Promo ishlatilishini yangilash */
+      // Promo ishlatilishini yangilash
       if (promoData && promoData.type !== 'free' && promoCode) {
         await supabase
           .from('promo_codes')
@@ -126,6 +170,8 @@ type Subscription = {
           .eq('code', promoCode.trim().toUpperCase())
       }
 
+      // Muvaffaqiyatli — cache'ga yoz va sahifani ko'rsat
+      setCachedStatus(userId)
       setStatus('active')
     } catch (err: any) {
       alert('Xatolik: ' + (err.message ?? 'Noma\'lum xato'))
@@ -135,8 +181,8 @@ type Subscription = {
   }
 
   /* ── HISOB-KITOB ── */
-  const plan = SUBSCRIPTION_PLANS[selectedPlan]
-  const isFreePromo = promoData?.type === 'free'
+  const plan         = SUBSCRIPTION_PLANS[selectedPlan]
+  const isFreePromo  = promoData?.type === 'free'
   const discountAmount = promoData && !isFreePromo
     ? promoData.discount_percent
       ? Math.round((plan.price * promoData.discount_percent) / 100)
@@ -185,7 +231,7 @@ type Subscription = {
           {/* REJALAR */}
           <div className="grid grid-cols-2 gap-3 mb-6">
             {(Object.keys(SUBSCRIPTION_PLANS) as PlanKey[]).map((key) => {
-              const p = SUBSCRIPTION_PLANS[key]
+              const p      = SUBSCRIPTION_PLANS[key]
               const active = selectedPlan === key
               return (
                 <button

@@ -5,13 +5,13 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import SubscriptionCheck from '@/components/SubscriptionCheck'
 import {
-  Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
-  ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
-  ArrowUpRight, Eye, FileText, Settings, Bell, Clock, Target,
-  RefreshCw, Percent, Zap, Award, LineChart, PieChart, Phone,
-  Mail, LogOut, ChevronDown, CheckCircle2, Save, Loader2,
-  UserPlus, Briefcase, Home, ArrowDownRight, ToggleLeft, ToggleRight,
-  Star, TrendingDown, Hash, CreditCard, Banknote, Globe
+  Search, Filter, Edit, Trash2, AlertCircle, TrendingUp, Package,
+  ShoppingCart, X, Plus, BarChart3, Calendar, Users, DollarSign,
+  ArrowUpRight, Eye, FileText, Settings, Bell, Clock, Target,
+  RefreshCw, Percent, Zap, Award, LineChart, PieChart, Phone,
+  Mail, LogOut, ChevronDown, CheckCircle2, Save, Loader2,
+  UserPlus, Briefcase, Home, ArrowDownRight, ToggleLeft, ToggleRight,
+  Star, TrendingDown, Hash, CreditCard, Banknote, Globe
 } from 'lucide-react'
 import Link from 'next/link' 
 
@@ -68,10 +68,10 @@ const DEMO_SALES = [
 ]
 
 const DEMO_DEBTS = [
-  { id: 1, customer: 'Xaridor #A001', amount: 1250000, paid: 450000, remaining: 800000, due_date: '2026-03-10', status: 'active', note: 'Elektronika' },
-  { id: 2, customer: 'Cafe "Ziyo"', amount: 850000, paid: 850000, remaining: 0, due_date: '2026-02-20', status: 'paid', note: '' },
-  { id: 3, customer: 'Do\'kon "Nur"', amount: 2450000, paid: 1000000, remaining: 1450000, due_date: '2026-03-05', status: 'active', note: 'Oylik hisob' },
-  { id: 4, customer: 'Shaxsiy Xaridor', amount: 320000, paid: 0, remaining: 320000, due_date: '2026-02-28', status: 'active', note: '' },
+  { id: 1, customer: 'Xaridor #A001', amount: 1250000, paid: 450000, remaining: 800000, due_date: '2026-03-10', give_date: '2026-02-20', status: 'active', note: 'Elektronika', phone: '+998 90 111 22 33', phone2: '', employee_name: 'Nilufar', product_name: 'Coca-Cola 0.5L', qty: 5 },
+  { id: 2, customer: 'Cafe "Ziyo"',    amount: 850000,  paid: 850000, remaining: 0,      due_date: '2026-02-20', give_date: '2026-01-15', status: 'paid',   note: '', phone: '+998 91 222 33 44', phone2: '', employee_name: 'Bekzod', product_name: 'Pepsi 1L', qty: 3 },
+  { id: 3, customer: 'Do\'kon "Nur"',  amount: 2450000, paid: 1000000, remaining: 1450000, due_date: '2026-03-05', give_date: '2026-02-01', status: 'active', note: 'Oylik hisob', phone: '+998 93 333 44 55', phone2: '+998 90 555 66 77', employee_name: 'Sardor', product_name: 'Snickers 50g', qty: 10 },
+  { id: 4, customer: 'Shaxsiy Xaridor', amount: 320000, paid: 0, remaining: 320000, due_date: '2026-02-28', give_date: '2026-02-10', status: 'active', note: '', phone: '+998 94 444 55 66', phone2: '', employee_name: 'Dilnoza', product_name: 'Nescafe 3in1', qty: 2 },
 ]
 
 const WEEK_CHART = [
@@ -149,10 +149,28 @@ export default function SmartDokon() {
   const [empForm, setEmpForm]   = useState({ name: '', position: 'Sotuvchi', phone: '', email: '', salary: '', sales_goal: '' })
   const [saleForm, setSaleForm] = useState({ product_id: '', employee_id: '', qty: '1', payment: 'Naqd' })
   const [goalForm, setGoalForm] = useState({ daily: '', weekly: '', monthly: '' })
-  const [debtForm, setDebtForm] = useState({ customer: '', amount: '', due_date: '', note: '' })
+
+  // ── YANGILANGAN: Qarz formasi ──────────────────────────────────────────────
+  const [debtForm, setDebtForm] = useState({
+    customer: '',
+    product_id: '',
+    qty: '1',
+    amount: 0,          // avtomatik hisoblanadi
+    due_date: '',
+    give_date: new Date().toISOString().slice(0, 10),
+    note: '',
+    employee_id: '',
+    phone: '',
+    phone2: '',
+  })
+
   const [settingsForm, setSettingsForm] = useState({ shop_name: '', phone: '', currency: 'UZS', notifications: true })
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+
+  // ── YANGI: Qarz eslatma banneri ───────────────────────────────────────────
+  const [debtReminders, setDebtReminders] = useState<any[]>([])
+  const [showDebtBanner, setShowDebtBanner] = useState(false)
 
   // Auth prompt
   const [authPrompt, setAuthPrompt] = useState(false)
@@ -167,6 +185,24 @@ export default function SmartDokon() {
     init()
   }, [])
 
+  // ── YANGI: Qarz muddati yaqinlashganda eslatma ─────────────────────────────
+  useEffect(() => {
+    if (debts.length === 0) return
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const soon = debts.filter((d: any) => {
+      if (d.status === 'paid') return false
+      const rem = d.remaining !== undefined ? d.remaining : (d.amount - (d.paid || 0))
+      if (rem <= 0) return false
+      const due = new Date(d.due_date)
+      due.setHours(0, 0, 0, 0)
+      const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      return diffDays >= 0 && diffDays <= 3
+    })
+    setDebtReminders(soon)
+    if (soon.length > 0) setShowDebtBanner(true)
+  }, [debts])
+
   // Period o'zgarganda real ma'lumotlarni yangilash
   useEffect(() => {
     if (user) {
@@ -178,10 +214,7 @@ export default function SmartDokon() {
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
       setUser(session.user)
-      // Fetch profile and check onboarding status
       await fetchProfile(session.user.id)
-      
-      // Fetch REAL data only for authenticated users (RLS will filter by user_id)
       await Promise.all([
         fetchProducts(),
         fetchEmployees(),
@@ -191,10 +224,7 @@ export default function SmartDokon() {
         fetchEmployeeKPIs(),
         fetchDebts()
       ])
-      
-      // NO demo data fallback for logged-in users - they should only see their own data
     } else {
-      // DEMO MODE: Only show demo data for unauthenticated users
       setProducts(DEMO_PRODUCTS)
       setEmployees(DEMO_EMPLOYEES)
       setDebts(DEMO_DEBTS)
@@ -211,34 +241,20 @@ export default function SmartDokon() {
   }
 
   const fetchProducts = async () => {
-    // RLS - faqat joriy foydalanuvchining ma'lumotlarini oladi
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching products:', error)
-      return
-    }
-    
-    // Faqat real ma'lumotlarni ko'rsatamiz (demo yo'q)
+    if (error) { console.error('Error fetching products:', error); return }
     setProducts(data || [])
   }
 
   const fetchEmployees = async () => {
-    // RLS - faqat joriy foydalanuvchining ma'lumotlarini oladi
     const { data, error } = await supabase
       .from('employees')
       .select('*')
       .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching employees:', error)
-      return
-    }
-    
-    // Faqat real ma'lumotlarni ko'rsatamiz (demo yo'q)
+    if (error) { console.error('Error fetching employees:', error); return }
     setEmployees(data || [])
   }
 
@@ -249,90 +265,42 @@ export default function SmartDokon() {
       .select('*')
       .eq('user_id', user.id)
       .order('due_date', { ascending: true })
-    
-    if (error) {
-      console.error('Error fetching debts:', error)
-      return
-    }
+    if (error) { console.error('Error fetching debts:', error); return }
     setDebts(data || [])
   }
 
-  // ── REAL-TIME DATA FETCHING ───────────────────────────────────────────────
   const fetchSales = async () => {
     if (!user) return
-    // Fetch sales with employee and product details
     const { data, error } = await supabase
       .from('sales')
-      .select(`
-        *,
-        employees (name),
-        sale_items (
-          *,
-          products (name)
-        )
-      `)
+      .select(`*, employees (name), sale_items (*, products (name))`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50)
-    
-    if (error) {
-      console.warn('Eslatma: Sotuvlar hozircha yuklanmadi.', error.message);
-      return [];
-    }
-    
+    if (error) { console.warn('Eslatma: Sotuvlar hozircha yuklanmadi.', error.message); return [] }
     setRecentSales(data || [])
   }
 
   const fetchAnalytics = async () => {
     if (!user) return
-    
-    // Get date range for the current period
     const now = new Date()
     let startDate: Date
-    
     switch (period) {
-      case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        break
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case 'month':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      case 'today':  startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break
+      case 'week':   startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break
+      case 'month':  startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break
+      default:       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     }
-
-    // Fetch sales for the period
     const { data: salesData, error: salesError } = await supabase
-      .from('sales')
-      .select('*, sale_items(*)')
-      .eq('user_id', user.id)
-      .gte('sale_date', startDate.toISOString())
-    
-    if (salesError) {
-      console.error('Error fetching analytics:', salesError)
-      return
-    }
-
-    // Fetch products for stock value calculation
-    const { data: productsData } = await supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', user.id)
-
-    // Calculate analytics
-    let totalSales = 0
-    let totalProfit = 0
-    let transactionCount = salesData?.length || 0
-    
+      .from('sales').select('*, sale_items(*)').eq('user_id', user.id).gte('sale_date', startDate.toISOString())
+    if (salesError) { console.error('Error fetching analytics:', salesError); return }
+    const { data: productsData } = await supabase.from('products').select('*').eq('user_id', user.id)
+    let totalSales = 0, totalProfit = 0, transactionCount = salesData?.length || 0
     if (salesData) {
       for (const sale of salesData) {
         totalSales += sale.total_price || 0
-        if (sale.sale_items && sale.sale_items.length > 0) {
+        if (sale.sale_items?.length > 0) {
           for (const item of sale.sale_items) {
-            // Get product cost for profit calculation
             const product = productsData?.find(p => p.id === item.product_id)
             const cost = (product?.cost || product?.price * 0.7 || 0)
             totalProfit += (item.unit_price - cost) * item.quantity
@@ -340,143 +308,54 @@ export default function SmartDokon() {
         }
       }
     }
-
-    const totalStockValue = (productsData || []).reduce((sum, p) => {
-      return sum + (p.price || 0) * (p.stock || 0)
-    }, 0)
-
+    const totalStockValue = (productsData || []).reduce((sum, p) => sum + (p.price || 0) * (p.stock || 0), 0)
     const avgCheck = transactionCount > 0 ? totalSales / transactionCount : 0
-
-    setAnalytics({
-      totalSales,
-      totalProfit,
-      totalStockValue,
-      transactionCount,
-      avgCheck
-    })
+    setAnalytics({ totalSales, totalProfit, totalStockValue, transactionCount, avgCheck })
   }
 
   const fetchWeeklyChart = async () => {
     if (!user) return
-    
     const now = new Date()
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    
-    // Fetch sales for the last 7 days grouped by day
-    const { data, error } = await supabase
-      .from('sales')
-      .select('sale_date, total_price')
-      .eq('user_id', user.id)
-      .gte('sale_date', weekAgo.toISOString())
-    
-    if (error) {
-      console.error('Error fetching weekly chart:', error)
-      return
-    }
-
-    // Group by day of week
-    const dayGroups: { [key: string]: number } = {
-      'Dush': 0, 'Sesh': 0, 'Chor': 0, 'Pay': 0, 'Jum': 0, 'Shan': 0, 'Yak': 0
-    }
+    const { data, error } = await supabase.from('sales').select('sale_date, total_price').eq('user_id', user.id).gte('sale_date', weekAgo.toISOString())
+    if (error) { console.error('Error fetching weekly chart:', error); return }
+    const dayGroups: { [key: string]: number } = { 'Dush': 0, 'Sesh': 0, 'Chor': 0, 'Pay': 0, 'Jum': 0, 'Shan': 0, 'Yak': 0 }
     const dayKeys = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan']
-    
     if (data) {
       for (const sale of data) {
         const date = new Date(sale.sale_date)
-        const dayIndex = date.getDay()
-        const dayName = dayKeys[dayIndex]
+        const dayName = dayKeys[date.getDay()]
         dayGroups[dayName] = (dayGroups[dayName] || 0) + (sale.total_price || 0)
       }
     }
-
-    const chartData = dayKeys.map(day => ({
-      day,
-      v: dayGroups[day] || 0
-    }))
-
-    setWeeklyChart(chartData)
+    setWeeklyChart(dayKeys.map(day => ({ day, v: dayGroups[day] || 0 })))
   }
 
   const fetchEmployeeKPIs = async () => {
     if (!user) return
-    
-    // Get today's date range
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    // Fetch all employees
-    const { data: employeesData, error: empError } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-    
-    if (empError || !employeesData) {
-      console.error('Error fetching employees for KPIs:', empError)
-      return
-    }
-
-    // Fetch today's sales
-    const { data: salesData } = await supabase
-      .from('sales')
-      .select('*, sale_items(*)')
-      .eq('user_id', user.id)
-      .gte('sale_date', todayStart.toISOString())
-
-    // Fetch inventory logs for warehouse workers
-    const { data: inventoryLogs } = await supabase
-      .from('inventory_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', todayStart.toISOString())
-
-    // Fetch all monthly sales for all employees at once (avoid await in map)
-    const { data: allMonthSales } = await supabase
-      .from('sales')
-      .select('employee_id, total_price')
-      .eq('user_id', user.id)
-      .gte('sale_date', monthStart.toISOString())
-
-    // Calculate KPIs for each employee
+    const { data: employeesData, error: empError } = await supabase.from('employees').select('*').eq('user_id', user.id).eq('is_active', true)
+    if (empError || !employeesData) { console.error('Error fetching employees for KPIs:', empError); return }
+    const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).gte('sale_date', todayStart.toISOString())
+    const { data: inventoryLogs } = await supabase.from('inventory_logs').select('*').eq('user_id', user.id).gte('created_at', todayStart.toISOString())
+    const { data: allMonthSales } = await supabase.from('sales').select('employee_id, total_price').eq('user_id', user.id).gte('sale_date', monthStart.toISOString())
     const kpis = employeesData.map(emp => {
       const empSales = (salesData || []).filter(s => s.employee_id === emp.id)
       const todaySales = empSales.reduce((sum, s) => sum + (s.total_price || 0), 0)
       const transactionCount = empSales.length
-      
-      // Get monthly sales for this employee from pre-fetched data
       const empMonthSales = (allMonthSales || []).filter(s => s.employee_id === emp.id)
       const monthSalesTotal = empMonthSales.reduce((sum, s) => sum + (s.total_price || 0), 0)
-
-      // Calculate performance based on role
       let performance = 0
       switch (emp.position) {
-        case 'Sotuvchi':
-          // Sales performance based on employee-specific daily goal
-          const goal = emp.sales_goal || 5000000
-          performance = goal > 0 ? Math.min(100, Math.round((todaySales / goal) * 100)) : 0
-          break
-        case 'Kassir':
-          // Transaction count performance (target: 50 transactions per day)
-          performance = Math.min(100, (transactionCount / 50) * 100)
-          break
-        case 'Omborchi':
-          // Inventory operations performance
-          const empLogs = (inventoryLogs || []).filter(l => l.product_id)
-          performance = Math.min(100, (empLogs.length / 20) * 100)
-          break
-        default:
-          performance = 0
+        case 'Sotuvchi': performance = Math.min(100, Math.round((todaySales / (emp.sales_goal || 5000000)) * 100)); break
+        case 'Kassir':   performance = Math.min(100, (transactionCount / 50) * 100); break
+        case 'Omborchi': performance = Math.min(100, ((inventoryLogs || []).filter(l => l.product_id).length / 20) * 100); break
+        default: performance = 0
       }
-
-      return {
-        ...emp,
-        sales_today: todaySales,
-        sales_month: monthSalesTotal,
-        performance: Math.round(performance),
-        transactions: transactionCount
-      }
+      return { ...emp, sales_today: todaySales, sales_month: monthSalesTotal, performance: Math.round(performance), transactions: transactionCount }
     })
-
     setEmployeeKPIs(kpis)
   }
 
@@ -485,11 +364,11 @@ export default function SmartDokon() {
     return true
   }
 
-const logout = async () => { 
-  await supabase.auth.signOut(); 
-  // '/auth/login' o'rniga shunchaki bosh sahifaga qaytaring
-  window.location.href = '/'; 
-}
+  const logout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
   // ── Mahsulot CRUD ──────────────────────────────────────────────────────────
   const openAddProduct = () => {
     if (!guard()) return
@@ -508,12 +387,7 @@ const logout = async () => {
   const saveProduct = async () => {
     if (!prodForm.name || !prodForm.price || !prodForm.stock) return showToast('Majburiy maydonlarni to\'ldiring!', 'err')
     setSaving(true)
-    const payload = {
-      name: prodForm.name, sku: prodForm.sku,
-      price: Number(prodForm.price), cost: Number(prodForm.cost) || 0,
-      stock: Number(prodForm.stock), min_stock_level: Number(prodForm.min_stock_level) || 10,
-      category: prodForm.category, user_id: user.id,
-    }
+    const payload = { name: prodForm.name, sku: prodForm.sku, price: Number(prodForm.price), cost: Number(prodForm.cost) || 0, stock: Number(prodForm.stock), min_stock_level: Number(prodForm.min_stock_level) || 10, category: prodForm.category, user_id: user.id }
     const { error } = editItem
       ? await supabase.from('products').update(payload).eq('id', editItem.id)
       : await supabase.from('products').insert([payload])
@@ -578,30 +452,63 @@ const logout = async () => {
     fetchEmployees()
   }
 
-  // ── Qarz CRUD ──────────────────────────────────────────────────────────────
+  // ── YANGILANGAN: Qarz CRUD ─────────────────────────────────────────────────
+  // Mahsulot tanlanganda narxni avtomatik hisoblash
+  const calcDebtAmount = (product_id: string, qty: string) => {
+    const prod = products.find(p => String(p.id) === String(product_id))
+    return prod ? (prod.price || 0) * (Number(qty) || 1) : 0
+  }
+
   const openAddDebt = () => {
     if (!guard()) return
-    setDebtForm({ customer: '', amount: '', due_date: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10), note: '' })
+    const defaultEmp = employees.find(e => e.is_active !== false)
+    setDebtForm({
+      customer: '',
+      product_id: '',
+      qty: '1',
+      amount: 0,
+      due_date: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+      give_date: new Date().toISOString().slice(0, 10),
+      note: '',
+      employee_id: defaultEmp?.id || '',
+      phone: '',
+      phone2: '',
+    })
     setEditDebtItem(null)
     setModal('debt')
   }
 
   const openEditDebt = (d: any) => {
     if (!guard()) return
-    setDebtForm({ 
-      customer: d.customer, 
-      amount: String(d.amount), 
-      due_date: d.due_date ? d.due_date.split('T')[0] : '', 
-      note: d.note || '' 
+    setDebtForm({
+      customer: d.customer,
+      product_id: String(d.product_id || ''),
+      qty: String(d.qty || 1),
+      amount: d.amount || 0,
+      due_date: d.due_date ? d.due_date.split('T')[0] : '',
+      give_date: d.give_date ? d.give_date.split('T')[0] : new Date().toISOString().slice(0, 10),
+      note: d.note || '',
+      employee_id: String(d.employee_id || ''),
+      phone: d.phone || '',
+      phone2: d.phone2 || '',
     })
     setEditDebtItem(d)
     setModal('debt')
   }
 
   const saveDebt = async () => {
-    if (!debtForm.customer || !debtForm.amount) return showToast('Xaridor va summani kiriting!', 'err')
+    if (!debtForm.customer) return showToast('Xaridor nomini kiriting!', 'err')
+    if (!debtForm.product_id) return showToast('Mahsulotni tanlang!', 'err')
+    if (!debtForm.employee_id) return showToast('Xodimni tanlang!', 'err')
+    if (!debtForm.phone) return showToast('Telefon raqamini kiriting!', 'err')
+
+    const amt = calcDebtAmount(debtForm.product_id, debtForm.qty)
+    if (amt <= 0) return showToast('Mahsulot narxi aniqlanmadi!', 'err')
+
+    const selectedProd = products.find(p => String(p.id) === String(debtForm.product_id))
+    const selectedEmp  = employees.find(e => String(e.id) === String(debtForm.employee_id))
+
     setSaving(true)
-    const amt = Number(debtForm.amount)
 
     if (!user) {
       // Demo rejimda lokal update
@@ -609,23 +516,39 @@ const logout = async () => {
         setDebts(prev => prev.map(d => d.id === editDebtItem.id ? {
           ...d,
           customer: debtForm.customer,
+          product_id: debtForm.product_id,
+          product_name: selectedProd?.name || '',
+          qty: Number(debtForm.qty),
           amount: amt,
+          remaining: amt - (editDebtItem.paid || 0),
           due_date: debtForm.due_date,
-          note: debtForm.note
+          give_date: debtForm.give_date,
+          note: debtForm.note,
+          employee_id: debtForm.employee_id,
+          employee_name: selectedEmp?.name || '',
+          phone: debtForm.phone,
+          phone2: debtForm.phone2,
         } : d))
       } else {
         const maxId = debts.length ? Math.max(...debts.map((d: any) => d.id)) : 0
-        const newDebt = {
+        setDebts(prev => [...prev, {
           id: maxId + 1,
           customer: debtForm.customer,
+          product_id: debtForm.product_id,
+          product_name: selectedProd?.name || '',
+          qty: Number(debtForm.qty),
           amount: amt,
           paid: 0,
           remaining: amt,
           due_date: debtForm.due_date,
+          give_date: debtForm.give_date,
           note: debtForm.note,
-          status: 'active'
-        }
-        setDebts(prev => [...prev, newDebt])
+          status: 'active',
+          employee_id: debtForm.employee_id,
+          employee_name: selectedEmp?.name || '',
+          phone: debtForm.phone,
+          phone2: debtForm.phone2,
+        }])
       }
       setSaving(false)
       showToast(editDebtItem ? 'Qarz yangilandi!' : 'Qarz qo\'shildi!')
@@ -635,13 +558,21 @@ const logout = async () => {
 
     const payload = {
       customer: debtForm.customer,
+      product_id: debtForm.product_id || null,
+      product_name: selectedProd?.name || '',
+      qty: Number(debtForm.qty),
       amount: amt,
       paid: editDebtItem ? (editDebtItem.paid || 0) : 0,
       remaining: amt - (editDebtItem ? (editDebtItem.paid || 0) : 0),
       due_date: debtForm.due_date,
+      give_date: debtForm.give_date,
       note: debtForm.note,
       user_id: user.id,
-      status: 'active'
+      status: 'active',
+      employee_id: debtForm.employee_id || null,
+      employee_name: selectedEmp?.name || '',
+      phone: debtForm.phone,
+      phone2: debtForm.phone2,
     }
     const { error } = editDebtItem
       ? await supabase.from('debts').update(payload).eq('id', editDebtItem.id)
@@ -676,9 +607,7 @@ const logout = async () => {
     if (isNaN(payAmt) || payAmt <= 0 || payAmt > rem) {
       return showToast(payAmt > rem ? 'Qoldiqdan ortiq to\'lov!' : 'Noto\'g\'ri summa!', 'err')
     }
-
     if (!user) {
-      // Demo lokal update
       setDebts(prev => prev.map((d: any) => d.id === id ? {
         ...d,
         paid: (d.paid || 0) + payAmt,
@@ -688,34 +617,21 @@ const logout = async () => {
       showToast(`${fmt(payAmt)} so'm to'landi!`)
       return
     }
-
     if (!guard()) return
     setSaving(true)
     const newPaid = (debt.paid || 0) + payAmt
     const newRem = debt.amount - newPaid
-    const { error } = await supabase.from('debts').update({
-      paid: newPaid,
-      remaining: newRem,
-      status: newRem <= 0 ? 'paid' : 'active'
-    }).eq('id', id)
+    const { error } = await supabase.from('debts').update({ paid: newPaid, remaining: newRem, status: newRem <= 0 ? 'paid' : 'active' }).eq('id', id)
     setSaving(false)
-    if (!error) {
-      showToast(`${fmt(payAmt)} so'm to'landi!`)
-      fetchDebts()
-    } else showToast('Xatolik!', 'err')
+    if (!error) { showToast(`${fmt(payAmt)} so'm to'landi!`); fetchDebts() }
+    else showToast('Xatolik!', 'err')
   }
 
   // ── Sotuv ──────────────────────────────────────────────────────────────────
   const openSale = () => {
     if (!guard()) return
-    // Set default employee if available
     const defaultEmployee = employees.find(e => e.is_active !== false)
-    setSaleForm({ 
-      product_id: products[0]?.id || '', 
-      employee_id: defaultEmployee?.id || '', 
-      qty: '1', 
-      payment: 'Naqd' 
-    })
+    setSaleForm({ product_id: products[0]?.id || '', employee_id: defaultEmployee?.id || '', qty: '1', payment: 'Naqd' })
     setModal('sale')
   }
 
@@ -727,15 +643,8 @@ const logout = async () => {
     const qty  = Number(saleForm.qty)
     if (qty > prod.stock) return showToast(`Zaxirada faqat ${prod.stock} dona bor!`, 'err')
     if (!user?.id) return showToast('Foydalanuvchi aniqlanmadi!', 'err')
-    
     setSaving(true)
-    
     try {
-      console.log('Saving sale with user_id:', user.id)
-      console.log('Employee ID:', saleForm.employee_id)
-      console.log('Product ID:', saleForm.product_id)
-      
-      // Step 1: Insert into sales table
       const { data: saleData, error: saleError } = await supabase.from('sales').insert([{
         employee_id: saleForm.employee_id,
         total_price: prod.price * qty,
@@ -743,51 +652,25 @@ const logout = async () => {
         user_id: user.id,
         sale_date: new Date().toISOString(),
       }]).select().single()
-      
       if (saleError) {
-        console.error('To\'liq xatolik ob\'ekti:', saleError);
-        
         const errorMessage = saleError.hint?.includes('employee_id') || saleError.message?.includes('employee_id')
-          ? "Ma'lumotlar bazasida 'employee_id' ustuni topilmadi. SQL Editor-da ustunni yarating."
-          : (saleError.message || "Sotuvni saqlashda xatolik yuz berdi");
-          
-        throw new Error(errorMessage);
-      }      
-      console.log('Sale created:', saleData)
-      
-      // Step 2: Insert into sale_items table (this will trigger stock reduction via DB trigger)
-      const { error: itemError } = await supabase.from('sale_items').insert([{
-        sale_id: saleData.id,
-        product_id: saleForm.product_id,
-        quantity: qty,
-        unit_price: prod.price,
-      }])
-      
-      if (itemError) {
-        console.error('Sale item insert error:', itemError)
-        // Rollback: delete the sale if item fails
-        await supabase.from('sales').delete().eq('id', saleData.id)
-        throw new Error(itemError.message || itemError.details || JSON.stringify(itemError))
+          ? "Ma'lumotlar bazasida 'employee_id' ustuni topilmadi."
+          : (saleError.message || "Sotuvni saqlashda xatolik yuz berdi")
+        throw new Error(errorMessage)
       }
-      
+      const { error: itemError } = await supabase.from('sale_items').insert([{
+        sale_id: saleData.id, product_id: saleForm.product_id, quantity: qty, unit_price: prod.price,
+      }])
+      if (itemError) {
+        await supabase.from('sales').delete().eq('id', saleData.id)
+        throw new Error(itemError.message || JSON.stringify(itemError))
+      }
       showToast(`Sotuv amalga oshirildi! +${fmt(prod.price * qty)} so'm`)
       setModal(null)
-      
-      // Refresh all data
-      await Promise.all([
-        fetchProducts(),
-        fetchSales(),
-        fetchAnalytics(),
-        fetchWeeklyChart(),
-        fetchEmployeeKPIs(),
-        fetchDebts()
-      ])
+      await Promise.all([fetchProducts(), fetchSales(), fetchAnalytics(), fetchWeeklyChart(), fetchEmployeeKPIs(), fetchDebts()])
     } catch (error: any) {
-      console.error('Sale error:', error)
-      const errorMsg = error.message || error.error_description || JSON.stringify(error) || 'Noma\'lum xatolik'
-      showToast('Xatolik: ' + errorMsg, 'err')
+      showToast('Xatolik: ' + (error.message || 'Noma\'lum xatolik'), 'err')
     }
-    
     setSaving(false)
   }
 
@@ -801,9 +684,7 @@ const logout = async () => {
   const saveGoals = async () => {
     const newGoals = { daily: Number(goalForm.daily) || 0, weekly: Number(goalForm.weekly) || 0, monthly: Number(goalForm.monthly) || 0 }
     setGoals(newGoals)
-    if (user) {
-      await supabase.from('profiles').update({ goals: newGoals }).eq('id', user.id)
-    }
+    if (user) { await supabase.from('profiles').update({ goals: newGoals }).eq('id', user.id) }
     showToast('Maqsadlar saqlandi!')
     setModal(null)
   }
@@ -814,9 +695,7 @@ const logout = async () => {
   const saveSettings = async () => {
     if (!user) return
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({
-      shop_name: settingsForm.shop_name, phone: settingsForm.phone,
-    }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ shop_name: settingsForm.shop_name, phone: settingsForm.phone }).eq('id', user.id)
     setSaving(false)
     if (!error) { showToast('Sozlamalar saqlandi!'); fetchProfile(user.id) }
     else showToast('Xatolik!', 'err')
@@ -839,14 +718,13 @@ const logout = async () => {
   const lowStock   = products.filter(p => (p.stock || 0) <= (p.min_stock_level || 10))
   const goalTarget = period === 'today' ? goals.daily : period === 'week' ? goals.weekly : goals.monthly
 
-  // REAL vs DEMO uchun samarali ko'rsatkichlar (1-talabni hal qilish)
-  const effectiveSales = user ? (analytics.totalSales || 0) : sales
-  const effectiveProfit = user ? (analytics.totalProfit || 0) : profit
-  const effectiveTxCount = user ? (analytics.transactionCount || 0) : txCount
+  const effectiveSales    = user ? (analytics.totalSales || 0) : sales
+  const effectiveProfit   = user ? (analytics.totalProfit || 0) : profit
+  const effectiveTxCount  = user ? (analytics.transactionCount || 0) : txCount
   const effectiveAvgCheck = user ? Math.round(analytics.avgCheck || 0) : avgCheck
-  const effectiveCost = user ? (effectiveSales - effectiveProfit) : cost
-  const effectiveMargin = effectiveSales > 0 ? ((effectiveProfit / effectiveSales) * 100).toFixed(1) : '0'
-  const effectiveGoalPct = goalTarget > 0 ? Math.min(100, Math.round((effectiveSales / goalTarget) * 100)) : 0
+  const effectiveCost     = user ? (effectiveSales - effectiveProfit) : cost
+  const effectiveMargin   = effectiveSales > 0 ? ((effectiveProfit / effectiveSales) * 100).toFixed(1) : '0'
+  const effectiveGoalPct  = goalTarget > 0 ? Math.min(100, Math.round((effectiveSales / goalTarget) * 100)) : 0
 
   if (!mounted) return null
 
@@ -859,6 +737,38 @@ const logout = async () => {
         <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold border transition-all ${toast.type === 'ok' ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-300' : 'bg-red-900/90 border-red-500/50 text-red-300'}`}>
           {toast.type === 'ok' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── YANGI: Qarz muddati eslatma banneri ────────────────────────────── */}
+      {showDebtBanner && debtReminders.length > 0 && (
+        <div className="fixed top-16 right-4 z-[90] max-w-sm w-full space-y-2">
+          {debtReminders.map((d: any) => {
+            const today = new Date(); today.setHours(0,0,0,0)
+            const due = new Date(d.due_date); due.setHours(0,0,0,0)
+            const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+            const rem = d.remaining !== undefined ? d.remaining : (d.amount - (d.paid || 0))
+            return (
+              <div key={d.id} className="bg-amber-900/95 border border-amber-500/60 rounded-2xl px-4 py-3 shadow-2xl flex items-start gap-3">
+                <Bell className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-bounce" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-amber-200 font-bold text-sm">{d.customer}</p>
+                  <p className="text-amber-300/80 text-xs">
+                    {diffDays === 0 ? '⚠️ Bugun muddat tugaydi!' : `⏰ ${diffDays} kun qoldi`} • {fmt(rem)} so'm
+                  </p>
+                  {d.phone && <p className="text-amber-400 text-xs mt-0.5 flex items-center gap-1"><Phone className="w-3 h-3" />{d.phone}</p>}
+                </div>
+                <button onClick={() => setDebtReminders(prev => prev.filter(r => r.id !== d.id))}
+                  className="text-amber-500 hover:text-amber-300 transition-all flex-shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )
+          })}
+          <button onClick={() => setShowDebtBanner(false)}
+            className="w-full text-center text-amber-500/70 hover:text-amber-400 text-xs py-1 transition-all">
+            Barchasini yopish
+          </button>
         </div>
       )}
 
@@ -877,16 +787,12 @@ const logout = async () => {
       {/* ── NAV ─────────────────────────────────────────────────────────────── */}
       <nav className="bg-slate-950 border-b border-slate-800 px-4 py-3 sticky top-0 z-40">
         <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2">
-
-          {/* Logo */}
           <div>
             <h1 className="text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
               {user && profile?.shop_name ? profile.shop_name : 'Aqlli-Dokon'}
             </h1>
             <p className="text-slate-500 text-xs">{user ? `@${profile?.username || ''}` : 'Demo rejim'}</p>
           </div>
-
-          {/* Period tanlov */}
           <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl">
             {PERIODS.map(p => (
               <button key={p.key} onClick={() => setPeriod(p.key)}
@@ -895,35 +801,32 @@ const logout = async () => {
               </button>
             ))}
           </div>
-
-          {/* View tugmalari */}
           <div className="flex items-center gap-1">
             {[
-              { k: 'bugun',      icon: <Home     className="w-4 h-4" />, l: 'Bosh'      },
-              { k: 'ombor',      icon: <Package  className="w-4 h-4" />, l: 'Ombor'     },
-              { k: 'xodimlar',   icon: <Users    className="w-4 h-4" />, l: 'Xodimlar'  },
-              { k: 'hisobotlar', icon: <FileText className="w-4 h-4" />, l: 'Hisobot'   },
-              { k: 'qarzlar',    icon: <CreditCard className="w-4 h-4" />, l: 'Qarzlar' },
+              { k: 'bugun',      icon: <Home       className="w-4 h-4" />, l: 'Bosh'     },
+              { k: 'ombor',      icon: <Package    className="w-4 h-4" />, l: 'Ombor'    },
+              { k: 'xodimlar',   icon: <Users      className="w-4 h-4" />, l: 'Xodimlar' },
+              { k: 'hisobotlar', icon: <FileText   className="w-4 h-4" />, l: 'Hisobot'  },
+              { k: 'qarzlar',    icon: <CreditCard className="w-4 h-4" />, l: 'Qarzlar'  },
             ].map(it => (
               <button key={it.k} onClick={() => setView(it.k)}
-                className={`px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-1.5 ${view === it.k ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                className={`px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-1.5 relative ${view === it.k ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 {it.icon}{it.l}
+                {it.k === 'qarzlar' && debtReminders.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-900 text-[10px] font-black rounded-full flex items-center justify-center">{debtReminders.length}</span>
+                )}
               </button>
             ))}
           </div>
-
-          {/* O'ng tomondagi tugmalar */}
           <div className="flex items-center gap-2">
-            <button onClick={openGoals} title="Maqsadlar" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all" ><Target className="w-4 h-4 text-amber-400" /></button>
+            <button onClick={openGoals} title="Maqsadlar" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"><Target className="w-4 h-4 text-amber-400" /></button>
             <button onClick={openSettings} title="Sozlamalar" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"><Settings className="w-4 h-4 text-slate-300" /></button>
-
             <button onClick={openSale} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold flex items-center gap-1.5 text-sm transition-all">
               <ShoppingCart className="w-4 h-4" />Sotuv
             </button>
             <button onClick={openAddProduct} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-1.5 text-sm transition-all">
               <Plus className="w-4 h-4" />Mahsulot
             </button>
-
             {user ? (
               <button onClick={logout} className="p-2 bg-slate-800 hover:bg-red-900/40 rounded-xl transition-all" title="Chiqish"><LogOut className="w-4 h-4 text-red-400" /></button>
             ) : (
@@ -953,7 +856,6 @@ const logout = async () => {
         {/* ═══════════════ BUGUN / DASHBOARD VIEW ═══════════════ */}
         {view === 'bugun' && (
           <>
-            {/* Maqsad progress banner */}
             {goalTarget > 0 && (
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -977,14 +879,13 @@ const logout = async () => {
               </div>
             )}
 
-            {/* KPI kartalar — 5 ustun */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {[
-                { label: 'Savdo', val: `${fmt(effectiveSales)} so'm`,    icon: <DollarSign className="w-5 h-5 text-emerald-400" />, bg: 'bg-emerald-500/15', sub: period === 'today' ? `${fmt(effectiveTxCount)} ta tranzaksiya` : period === 'week' ? `7 kunlik ko'rsatkich` : `30 kunlik ko'rsatkich`, subColor: 'text-emerald-400' },
-                { label: 'Foyda', val: `${fmt(effectiveProfit)} so'm`,   icon: <TrendingUp className="w-5 h-5 text-blue-400" />,    bg: 'bg-blue-500/15',    sub: `Marja: ${effectiveMargin}%`, subColor: 'text-blue-400' },
-                { label: 'Tranzaksiya', val: `${fmt(effectiveTxCount)} ta`, icon: <ShoppingCart className="w-5 h-5 text-purple-400" />, bg: 'bg-purple-500/15', sub: `O'rtacha: ${fmt(effectiveAvgCheck)} so'm`, subColor: 'text-purple-400' },
-                { label: 'Ombor qiymati', val: `${fmt(totalValue)} so'm`, icon: <Package className="w-5 h-5 text-indigo-400" />, bg: 'bg-indigo-500/15', sub: `${products.length} xil mahsulot`, subColor: 'text-indigo-400' },
-                { label: 'Kam zaxira', val: `${lowStock.length} ta`, icon: <AlertCircle className="w-5 h-5 text-orange-400" />, bg: 'bg-orange-500/15', sub: 'Diqqat talab qiladi', subColor: 'text-orange-400' },
+                { label: 'Savdo',        val: `${fmt(effectiveSales)} so'm`,      icon: <DollarSign  className="w-5 h-5 text-emerald-400" />, bg: 'bg-emerald-500/15', sub: period === 'today' ? `${fmt(effectiveTxCount)} ta tranzaksiya` : period === 'week' ? `7 kunlik ko'rsatkich` : `30 kunlik ko'rsatkich`, subColor: 'text-emerald-400' },
+                { label: 'Foyda',        val: `${fmt(effectiveProfit)} so'm`,     icon: <TrendingUp  className="w-5 h-5 text-blue-400" />,    bg: 'bg-blue-500/15',    sub: `Marja: ${effectiveMargin}%`, subColor: 'text-blue-400' },
+                { label: 'Tranzaksiya',  val: `${fmt(effectiveTxCount)} ta`,      icon: <ShoppingCart className="w-5 h-5 text-purple-400" />, bg: 'bg-purple-500/15',  sub: `O'rtacha: ${fmt(effectiveAvgCheck)} so'm`, subColor: 'text-purple-400' },
+                { label: 'Ombor qiymati', val: `${fmt(totalValue)} so'm`,         icon: <Package     className="w-5 h-5 text-indigo-400" />, bg: 'bg-indigo-500/15',  sub: `${products.length} xil mahsulot`, subColor: 'text-indigo-400' },
+                { label: 'Kam zaxira',   val: `${lowStock.length} ta`,            icon: <AlertCircle className="w-5 h-5 text-orange-400" />, bg: 'bg-orange-500/15',  sub: 'Diqqat talab qiladi', subColor: 'text-orange-400' },
               ].map((kpi, i) => (
                 <div key={i} className="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-2xl p-4 transition-all">
                   <div className="flex items-center justify-between mb-3">
@@ -998,10 +899,7 @@ const logout = async () => {
               ))}
             </div>
 
-            {/* 2-qator: grafik + kategoriyalar */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-
-              {/* 7 kunlik grafik */}
               <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-white flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-400" />Haftalik Savdo</h3>
@@ -1025,7 +923,6 @@ const logout = async () => {
                 </div>
               </div>
 
-              {/* Top mahsulotlar */}
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-white flex items-center gap-2"><Star className="w-5 h-5 text-amber-400" />Top Mahsulotlar</h3>
@@ -1046,10 +943,7 @@ const logout = async () => {
               </div>
             </div>
 
-            {/* 3-qator: sotuv tarixi + kam zaxira */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-
-              {/* Sotuv tarixi */}
               <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-white flex items-center gap-2"><Clock className="w-5 h-5 text-blue-400" />So'nggi Sotuvlar</h3>
@@ -1091,7 +985,6 @@ const logout = async () => {
                 </div>
               </div>
 
-              {/* Kam zaxira ogohlantirish */}
               <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
                 <h3 className="font-bold text-white flex items-center gap-2 mb-4">
                   <AlertCircle className="w-5 h-5 text-red-400" />Kam Zaxira
@@ -1121,12 +1014,11 @@ const logout = async () => {
               </div>
             </div>
 
-            {/* Oylik statistika qatorlari */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
-                { label: 'Daromad', val: fmt(effectiveSales), sub: 'so\'m', icon: <DollarSign className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
-                { label: 'Foyda',   val: fmt(effectiveProfit), sub: 'so\'m', icon: <Award className="w-5 h-5 text-blue-400" />,    color: 'text-blue-400'    },
-                { label: 'Xarajat', val: fmt(effectiveCost),   sub: 'so\'m', icon: <TrendingDown className="w-5 h-5 text-red-400" />, color: 'text-red-400'  },
+                { label: 'Daromad', val: fmt(effectiveSales),  sub: 'so\'m', icon: <DollarSign   className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
+                { label: 'Foyda',   val: fmt(effectiveProfit), sub: 'so\'m', icon: <Award        className="w-5 h-5 text-blue-400" />,    color: 'text-blue-400'    },
+                { label: 'Xarajat', val: fmt(effectiveCost),   sub: 'so\'m', icon: <TrendingDown className="w-5 h-5 text-red-400" />,     color: 'text-red-400'     },
               ].map((item, i) => (
                 <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-2">{item.icon}<p className="text-slate-400 text-sm">{item.label}</p></div>
@@ -1186,9 +1078,7 @@ const logout = async () => {
                         <td className="px-4 py-3 text-purple-400 font-semibold">{p.sold_month || 0}</td>
                         <td className="px-4 py-3">
                           <button onClick={() => toggleProductActive(p)} className="transition-all">
-                            {p.active !== false
-                              ? <ToggleRight className="w-6 h-6 text-emerald-400" />
-                              : <ToggleLeft  className="w-6 h-6 text-slate-600"   />}
+                            {p.active !== false ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
                           </button>
                         </td>
                         <td className="px-4 py-3">
@@ -1237,9 +1127,7 @@ const logout = async () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => toggleEmployeeActive(emp)} title={emp.is_active !== false ? 'O\'chirish' : 'Yoqish'}>
-                        {emp.is_active !== false
-                          ? <ToggleRight className="w-6 h-6 text-emerald-400" />
-                          : <ToggleLeft  className="w-6 h-6 text-slate-600"   />}
+                        {emp.is_active !== false ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
                       </button>
                       <button onClick={() => openEditEmployee(emp)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
                       <button onClick={() => deleteEmployee(emp.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
@@ -1308,14 +1196,14 @@ const logout = async () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {[
-                { label: 'Jami Savdo',   val: fmt(effectiveSales),         sub: 'so\'m',     color: 'text-emerald-400', icon: <DollarSign className="w-6 h-6" /> },
-                { label: 'Jami Foyda',   val: fmt(effectiveProfit),        sub: 'so\'m',     color: 'text-blue-400',    icon: <Award className="w-6 h-6" /> },
-                { label: 'Foyda Marja',  val: effectiveMargin,             sub: '%',         color: 'text-purple-400',  icon: <Percent className="w-6 h-6" /> },
-                { label: 'Savdo soni',   val: fmt(effectiveTxCount),       sub: 'ta',        color: 'text-cyan-400',    icon: <ShoppingCart className="w-6 h-6" /> },
-                { label: 'O\'rtacha chek', val: fmt(effectiveAvgCheck),    sub: 'so\'m',     color: 'text-amber-400',   icon: <CreditCard className="w-6 h-6" /> },
-                { label: 'Ombor qiymati', val: fmt(totalValue),   sub: 'so\'m',     color: 'text-indigo-400',  icon: <Package className="w-6 h-6" /> },
-                { label: 'Mahsulotlar',  val: String(products.length), sub: 'tur',  color: 'text-teal-400',    icon: <Hash className="w-6 h-6" /> },
-                { label: 'Xodimlar',     val: String(employees.filter(e => e.is_active !== false).length), sub: 'aktiv', color: 'text-rose-400', icon: <Users className="w-6 h-6" /> },
+                { label: 'Jami Savdo',     val: fmt(effectiveSales),       sub: 'so\'m', color: 'text-emerald-400', icon: <DollarSign   className="w-6 h-6" /> },
+                { label: 'Jami Foyda',     val: fmt(effectiveProfit),      sub: 'so\'m', color: 'text-blue-400',    icon: <Award        className="w-6 h-6" /> },
+                { label: 'Foyda Marja',    val: effectiveMargin,           sub: '%',     color: 'text-purple-400',  icon: <Percent      className="w-6 h-6" /> },
+                { label: 'Savdo soni',     val: fmt(effectiveTxCount),     sub: 'ta',    color: 'text-cyan-400',    icon: <ShoppingCart className="w-6 h-6" /> },
+                { label: 'O\'rtacha chek', val: fmt(effectiveAvgCheck),    sub: 'so\'m', color: 'text-amber-400',   icon: <CreditCard   className="w-6 h-6" /> },
+                { label: 'Ombor qiymati',  val: fmt(totalValue),           sub: 'so\'m', color: 'text-indigo-400',  icon: <Package      className="w-6 h-6" /> },
+                { label: 'Mahsulotlar',    val: String(products.length),   sub: 'tur',   color: 'text-teal-400',    icon: <Hash         className="w-6 h-6" /> },
+                { label: 'Xodimlar',       val: String(employees.filter(e => e.is_active !== false).length), sub: 'aktiv', color: 'text-rose-400', icon: <Users className="w-6 h-6" /> },
               ].map((item, i) => (
                 <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-5 hover:border-slate-600 transition-all">
                   <div className="flex items-center gap-3 mb-3 text-slate-500">{item.icon}<span className="text-sm">{item.label}</span></div>
@@ -1324,7 +1212,6 @@ const logout = async () => {
               ))}
             </div>
 
-            {/* Davr bo'yicha taqqoslash */}
             <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2"><LineChart className="w-5 h-5 text-purple-400" />Davr Taqqoslashi</h3>
               <div className="grid grid-cols-3 gap-4">
@@ -1354,9 +1241,21 @@ const logout = async () => {
           </>
         )}
 
-        {/* ═══════════════ QARZLAR VIEW (2-talab) ═══════════════ */}
+        {/* ═══════════════ QARZLAR VIEW ═══════════════ */}
         {view === 'qarzlar' && (
           <>
+            {/* Qarz eslatma banneri - qarzlar sahifasida ham ko'rsatish */}
+            {debtReminders.length > 0 && (
+              <div className="bg-amber-900/30 border border-amber-600/40 rounded-2xl p-4 flex items-center gap-3">
+                <Bell className="w-5 h-5 text-amber-400 flex-shrink-0 animate-bounce" />
+                <div className="flex-1">
+                  <p className="text-amber-200 font-bold text-sm">⚠️ {debtReminders.length} ta qarz muddati yaqinlashdi!</p>
+                  <p className="text-amber-300/70 text-xs">{debtReminders.map((d: any) => d.customer).join(', ')}</p>
+                </div>
+                <button onClick={() => setView('qarzlar')} className="px-3 py-1.5 bg-amber-500 text-slate-900 rounded-lg text-xs font-bold">Ko'rish</button>
+              </div>
+            )}
+
             <div className="flex gap-3 flex-wrap">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
@@ -1369,36 +1268,63 @@ const logout = async () => {
 
             <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-sm">
+                <table className="w-full min-w-[1000px] text-sm">
                   <thead className="bg-slate-900 border-b border-slate-700">
-                    <tr>{['Xaridor', 'Umumiy Qarz', 'To\'langan', 'Qoldiq', 'Muddat', 'Holat', 'Amallar'].map(h =>
-                      <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase">{h}</th>
+                    <tr>{['Xaridor', 'Mahsulot', 'Xodim', 'Telefon', 'Umumiy', "To'langan", 'Qoldiq', 'Berilgan', 'Muddat', 'Holat', 'Amallar'].map(h =>
+                      <th key={h} className="px-3 py-3 text-left text-xs font-bold text-slate-400 uppercase">{h}</th>
                     )}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {debts.filter((d: any) => d.customer.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                      <tr><td colSpan={7} className="py-12 text-center text-slate-500">Qarz topilmadi</td></tr>
+                      <tr><td colSpan={11} className="py-12 text-center text-slate-500">Qarz topilmadi</td></tr>
                     ) : debts.filter((d: any) => d.customer.toLowerCase().includes(search.toLowerCase())).map((d: any) => {
                       const rem = d.remaining !== undefined ? d.remaining : (d.amount - (d.paid || 0))
-                      const isOverdue = new Date(d.due_date) < new Date() && rem > 0
+                      const today = new Date(); today.setHours(0,0,0,0)
+                      const due = new Date(d.due_date); due.setHours(0,0,0,0)
+                      const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                      const isOverdue = diffDays < 0 && rem > 0
+                      const isSoon    = diffDays >= 0 && diffDays <= 3 && rem > 0
                       return (
-                        <tr key={d.id} className="hover:bg-slate-700/40 transition-all">
-                          <td className="px-4 py-3 font-semibold text-white">{d.customer}</td>
-                          <td className="px-4 py-3 text-red-400 font-bold">{fmt(d.amount)} so'm</td>
-                          <td className="px-4 py-3 text-emerald-400 font-bold">{fmt(d.paid || 0)} so'm</td>
-                          <td className="px-4 py-3">
+                        <tr key={d.id} className={`hover:bg-slate-700/40 transition-all ${isSoon ? 'bg-amber-900/10' : ''}`}>
+                          <td className="px-3 py-3">
+                            <p className="font-semibold text-white">{d.customer}</p>
+                            {d.phone2 && <p className="text-slate-500 text-xs">{d.phone2}</p>}
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="text-slate-300 text-xs">{d.product_name || '—'}</p>
+                            {d.qty && <p className="text-slate-500 text-xs">{d.qty} dona</p>}
+                          </td>
+                          <td className="px-3 py-3 text-slate-400 text-xs">{d.employee_name || '—'}</td>
+                          <td className="px-3 py-3">
+                            {d.phone ? (
+                              <a href={`tel:${d.phone}`} className="text-blue-400 text-xs hover:underline flex items-center gap-1">
+                                <Phone className="w-3 h-3" />{d.phone}
+                              </a>
+                            ) : <span className="text-slate-600 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-red-400 font-bold">{fmt(d.amount)} so'm</td>
+                          <td className="px-3 py-3 text-emerald-400 font-bold">{fmt(d.paid || 0)} so'm</td>
+                          <td className="px-3 py-3">
                             <span className={`font-bold ${rem > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{fmt(rem)} so'm</span>
                           </td>
-                          <td className="px-4 py-3 text-slate-400">
-                            {new Date(d.due_date).toLocaleDateString('uz-UZ')}
-                            {isOverdue && <span className="ml-2 text-red-400 text-xs"> (kechikkan)</span>}
+                          <td className="px-3 py-3 text-slate-400 text-xs">
+                            {d.give_date ? new Date(d.give_date).toLocaleDateString('uz-UZ') : '—'}
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${d.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : isOverdue ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                              {d.status === 'paid' ? 'To\'langan' : isOverdue ? 'Kechikkan' : 'Faol'}
+                          <td className="px-3 py-3">
+                            <div>
+                              <p className={`text-xs ${isOverdue ? 'text-red-400' : isSoon ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+                                {new Date(d.due_date).toLocaleDateString('uz-UZ')}
+                              </p>
+                              {isSoon && !isOverdue && <p className="text-amber-400 text-[10px]">⏰ {diffDays === 0 ? 'Bugun!' : `${diffDays} kun`}</p>}
+                              {isOverdue && <p className="text-red-400 text-[10px]">⚠️ kechikkan</p>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${d.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : isOverdue ? 'bg-red-500/20 text-red-400' : isSoon ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                              {d.status === 'paid' ? 'To\'langan' : isOverdue ? 'Kechikkan' : isSoon ? 'Yaqin' : 'Faol'}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-3">
                             <div className="flex gap-1">
                               <button onClick={() => openEditDebt(d)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg"><Edit className="w-3.5 h-3.5" /></button>
                               <button onClick={() => deleteDebt(d.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -1411,9 +1337,9 @@ const logout = async () => {
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-900/70">
-                      <td colSpan={3} className="py-3 px-4 font-bold text-slate-300">Jami qarz:</td>
-                      <td className="py-3 px-4 font-black text-red-400">{fmt(debts.reduce((sum: number, d: any) => sum + (d.remaining !== undefined ? d.remaining : d.amount - (d.paid||0)), 0 ))} so'm</td>
-                      <td colSpan={3}></td>
+                      <td colSpan={6} className="py-3 px-3 font-bold text-slate-300">Jami qoldiq qarz:</td>
+                      <td className="py-3 px-3 font-black text-red-400">{fmt(debts.reduce((sum: number, d: any) => sum + (d.remaining !== undefined ? d.remaining : d.amount - (d.paid||0)), 0))} so'm</td>
+                      <td colSpan={4}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1474,7 +1400,7 @@ const logout = async () => {
         </div>
       </Modal>
 
-      {/* Xodim qo'shish/tahrirlash (3-talab - maqsad qo'shildi) */}
+      {/* Xodim qo'shish/tahrirlash */}
       <Modal open={modal === 'employee'} onClose={() => setModal(null)}
         title={editItem ? 'Xodimni Tahrirlash' : "Xodim Qo'shish"}
         icon={<Users className="w-5 h-5 text-blue-400" />}>
@@ -1551,8 +1477,6 @@ const logout = async () => {
               </select>
             </div>
           </div>
-
-          {/* Sotuv jami */}
           {saleForm.product_id && saleForm.qty && (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl">
               {(() => {
@@ -1578,7 +1502,6 @@ const logout = async () => {
               })()}
             </div>
           )}
-
           <button onClick={saveSale} disabled={saving || !saleForm.product_id || !saleForm.employee_id} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
             {saving ? 'Amalga oshirilmoqda...' : 'Sotuvni Tasdiqlash'}
@@ -1592,9 +1515,9 @@ const logout = async () => {
         <div className="space-y-4">
           <p className="text-slate-400 text-sm">Har bir davr uchun savdo maqsadini kiriting. Progress bosh sahifada ko'rinadi.</p>
           {[
-            { label: 'Kunlik Maqsad', key: 'daily',   ph: '15 000 000', cur: goals.daily   },
-            { label: 'Haftalik Maqsad', key: 'weekly', ph: '100 000 000', cur: goals.weekly },
-            { label: 'Oylik Maqsad', key: 'monthly',   ph: '400 000 000', cur: goals.monthly},
+            { label: 'Kunlik Maqsad',   key: 'daily',   ph: '15 000 000',  cur: goals.daily   },
+            { label: 'Haftalik Maqsad', key: 'weekly',  ph: '100 000 000', cur: goals.weekly  },
+            { label: 'Oylik Maqsad',    key: 'monthly', ph: '400 000 000', cur: goals.monthly },
           ].map(item => (
             <div key={item.key}>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block flex items-center justify-between">
@@ -1612,32 +1535,125 @@ const logout = async () => {
         </div>
       </Modal>
 
-      {/* Qarz qo'shish/tahrirlash (2-talab) */}
+      {/* ═══════════════ YANGILANGAN: Qarz qo'shish/tahrirlash modali ═══════════════ */}
       <Modal open={modal === 'debt'} onClose={() => setModal(null)}
         title={editDebtItem ? 'Qarzni Tahrirlash' : 'Yangi Qarz Qo\'shish'}
-        icon={<CreditCard className="w-5 h-5 text-rose-400" />}>
+        icon={<CreditCard className="w-5 h-5 text-rose-400" />} wide>
         <div className="space-y-4">
+
+          {/* Xaridor ismi */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Xaridor nomi *</label>
             <input className={inp} placeholder="Xaridor ism yoki do'kon" value={debtForm.customer} onChange={e => setDebtForm(f => ({...f, customer: e.target.value}))} />
           </div>
+
+          {/* Xodim tanlash */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Qarzga bergan xodim *</label>
+            <select className={sel} value={debtForm.employee_id}
+              onChange={e => setDebtForm(f => ({...f, employee_id: e.target.value}))}>
+              <option value="">Xodimni tanlang...</option>
+              {employees.filter(e => e.is_active !== false).map(e => (
+                <option key={e.id} value={e.id}>{e.name} — {e.position}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Mahsulot tanlash */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Mahsulot *</label>
+            <select className={sel} value={debtForm.product_id}
+              onChange={e => {
+                const pid = e.target.value
+                setDebtForm(f => ({
+                  ...f,
+                  product_id: pid,
+                  amount: calcDebtAmount(pid, f.qty)
+                }))
+              }}>
+              <option value="">Mahsulotni tanlang...</option>
+              {products.filter(p => p.active !== false).map(p => (
+                <option key={p.id} value={p.id}>{p.name} — {fmt(p.price)} so'm (Zaxira: {p.stock})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Miqdor va avtomatik summa */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Qarz summasi (so'm) *</label>
-              <input className={inp} type="number" placeholder="1250000" value={debtForm.amount} onChange={e => setDebtForm(f => ({...f, amount: e.target.value}))} />
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Miqdor (dona) *</label>
+              <input className={inp} type="number" min="1" placeholder="1" value={debtForm.qty}
+                onChange={e => {
+                  const qty = e.target.value
+                  setDebtForm(f => ({
+                    ...f,
+                    qty,
+                    amount: calcDebtAmount(f.product_id, qty)
+                  }))
+                }} />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Muddat (sana)</label>
-              <input className={inp} type="date" value={debtForm.due_date} onChange={e => setDebtForm(f => ({...f, due_date: e.target.value}))} />
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Jami summa (avtomatik)</label>
+              <div className={`${inp} bg-slate-800 cursor-not-allowed flex items-center`}>
+                {debtForm.amount > 0
+                  ? <span className="text-emerald-400 font-bold">{fmt(debtForm.amount)} so'm</span>
+                  : <span className="text-slate-600">Mahsulot tanlang...</span>
+                }
+              </div>
             </div>
           </div>
+
+          {/* Mahsulot tafsiloti preview */}
+          {debtForm.product_id && debtForm.amount > 0 && (() => {
+            const prod = products.find(p => String(p.id) === String(debtForm.product_id))
+            return (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">{prod?.name}</span>
+                  <span className="text-rose-300 font-bold">{fmt(prod?.price || 0)} × {debtForm.qty} = {fmt(debtForm.amount)} so'm</span>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Telefon raqamlari */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Telefon raqami *</label>
+              <input className={inp} placeholder="+998 90 123 45 67" value={debtForm.phone}
+                onChange={e => setDebtForm(f => ({...f, phone: e.target.value}))} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Oila/yaqin raqami</label>
+              <input className={inp} placeholder="+998 91 987 65 43" value={debtForm.phone2}
+                onChange={e => setDebtForm(f => ({...f, phone2: e.target.value}))} />
+            </div>
+          </div>
+
+          {/* Sanalar */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Berilgan sana</label>
+              <input className={inp} type="date" value={debtForm.give_date}
+                onChange={e => setDebtForm(f => ({...f, give_date: e.target.value}))} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Qaytarish muddati</label>
+              <input className={inp} type="date" value={debtForm.due_date}
+                onChange={e => setDebtForm(f => ({...f, due_date: e.target.value}))} />
+            </div>
+          </div>
+
+          {/* Eslatma */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Eslatma / Izoh</label>
-            <textarea className={`${inp} h-24 resize-y`} placeholder="Qarz sababi..." value={debtForm.note} onChange={e => setDebtForm(f => ({...f, note: e.target.value}))} />
+            <textarea className={`${inp} h-20 resize-y`} placeholder="Qarz sababi yoki qo'shimcha ma'lumot..."
+              value={debtForm.note} onChange={e => setDebtForm(f => ({...f, note: e.target.value}))} />
           </div>
+
           <button onClick={saveDebt} disabled={saving} className="w-full py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? 'Saqlanmoqda...' : editDebtItem ? 'Yangilash' : "Qo'shish"}
+            {saving ? 'Saqlanmoqda...' : editDebtItem ? 'Yangilash' : "Qarzni Qo'shish"}
           </button>
         </div>
       </Modal>
@@ -1646,8 +1662,6 @@ const logout = async () => {
       <Modal open={modal === 'settings'} onClose={() => setModal(null)}
         title="Tizim Sozlamalari" icon={<Settings className="w-5 h-5 text-slate-300" />} wide>
         <div className="space-y-6">
-
-          {/* Do'kon ma'lumotlari */}
           <div>
             <h3 className="text-white font-bold mb-3 flex items-center gap-2"><Briefcase className="w-4 h-4 text-blue-400" />Do'kon Ma'lumotlari</h3>
             <div className="space-y-3">
@@ -1661,8 +1675,6 @@ const logout = async () => {
               </div>
             </div>
           </div>
-
-          {/* Profil ma'lumotlari */}
           {user && profile && (
             <div>
               <h3 className="text-white font-bold mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-purple-400" />Profil</h3>
@@ -1674,15 +1686,12 @@ const logout = async () => {
               </div>
             </div>
           )}
-
-          {/* Xavfli zona */}
           <div>
             <h3 className="text-red-400 font-bold mb-3 flex items-center gap-2"><AlertCircle className="w-4 h-4" />Xavfli Zona</h3>
             <button onClick={logout} className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 border border-red-700/50 text-red-400 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
               <LogOut className="w-4 h-4" />Tizimdan Chiqish
             </button>
           </div>
-
           <button onClick={saveSettings} disabled={saving || !user} className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saqlanmoqda...' : 'Saqlash'}
@@ -1690,21 +1699,16 @@ const logout = async () => {
         </div>
       </Modal>
 
-    </div> 
-  // 1. Agar foydalanuvchi tizimga kirgan bo'lsa va profili mavjud bo'lsa:
-// Obuna tekshiruvi bilan ko'rsatamiz
-        )
-if (user && profile) {
-  return (
-    <SubscriptionCheck userId={user.id}>
-      {mainContent}
-    </SubscriptionCheck>
-  );
-}
+    </div>
+  )
 
-// 2. Aks holda (yoki demo rejimda):
-// Obuna tekshiruvisiz asosiy kontentni ko'rsatamiz
-return mainContent;
-}
+  if (user && profile) {
+    return (
+      <SubscriptionCheck userId={user.id}>
+        {mainContent}
+      </SubscriptionCheck>
+    )
+  }
 
-//  
+  return mainContent
+}

@@ -1,7 +1,22 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "lib": ["deno.window"],
-    "strict": true
+    "lib": ["deno.window", "dom", "dom.iterable", "esnext"],
+    "strict": true,
+    "jsx": "react-jsx"
+  },
+  "imports": {
+    "@/": "./"
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "jsx-button-has-type",
+        "no-window",
+        "no-explicit-any",
+        "no-unused-vars",
+        "no-irregular-whitespace"
+      ]
+    }
   }
 }
