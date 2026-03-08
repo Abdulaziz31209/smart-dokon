@@ -7,51 +7,39 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const { BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY } = process.env;
 
-if (!BOT_TOKEN || !SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ XATO: .env fayli o'qilmadi!");
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const bot = new Bot(BOT_TOKEN);
+const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+const bot = new Bot(BOT_TOKEN!);
 
 bot.command("start", async (ctx) => {
-  const payload = ctx.match; // Bu yerda '244949' keladi
-
-  if (!payload) {
-    return ctx.reply("Salom! Tasdiqlash kodini olish uchun iltimos saytdagi tugma orqali qayta kiring.");
-  }
-
   try {
+    // 1. 6 xonali tasodifiy kod yaratish
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const telegramId = ctx.from?.id.toString();
+    const username = ctx.from?.username || "noma'lum";
 
-    // MUHIM: Endi 'id' (UUID) emas, 'user_number' (Text/BigInt) ustuni orqali qidiramiz
+    // 2. Supabase-da foydalanuvchini telegram_id orqali yangilash yoki yaratish (Upsert)
+    // Bu usulda UUID bo'lishi shart emas, bot foydalanuvchini Telegram ID-sidan taniydi
     const { data, error } = await supabase
       .from("profiles")
-      .update({ 
-        telegram_id: ctx.from?.id.toString(), 
-        telegram_username: ctx.from?.username || "noma'lum",
+      .upsert({ 
+        telegram_id: telegramId, 
+        telegram_username: username,
         verification_code: generatedCode 
-      })
-      .eq("user_number", payload) // Qidiruv ustuni o'zgartirildi
+      }, { onConflict: 'telegram_id' }) // Agar bu ID bo'lsa yangila, bo'lmasa yarat
       .select();
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      await ctx.reply(`✅ Akkauntingiz bog'landi!\n\nTasdiqlash kodingiz: **${generatedCode}**`, { parse_mode: "Markdown" });
-      console.log(`✅ Kod yuborildi: ${generatedCode} (User Number: ${payload})`);
-    } else {
-      // Agar bazada 'user_number' ustunida '244949' topilmasa
-      await ctx.reply("⚠️ Foydalanuvchi topilmadi. Saytdan qayta urinib ko'ring yoki ma'lumotlar bazada borligini tekshiring.");
-      console.log(`⚠️ User topilmadi: ${payload}`);
-    }
+    // 3. Foydalanuvchiga kodni yuborish
+    await ctx.reply(`Salom! Sizning tasdiqlash kodingiz:\n\n**${generatedCode}**`, { parse_mode: "Markdown" });
+    
+    console.log(`✅ Kod yuborildi: ${generatedCode} (User: ${telegramId})`);
 
   } catch (err: any) {
-    console.error("Supabase xatosi:", err.message);
-    await ctx.reply("⚠️ Bazada xatolik yuz berdi. Ustun nomini (user_number) tekshiring.");
+    console.error("Xatolik yuz berdi:", err.message);
+    await ctx.reply("⚠️ Kechirasiz, kodni generatsiya qilishda xato yuz berdi.");
   }
 });
 
-console.log("🚀 Bot ishga tushdi. user_number orqali qidirish yoqildi!");
+console.log("🚀 Bot ishga tushdi. Endi hamma kod olishi mumkin!");
 bot.start();

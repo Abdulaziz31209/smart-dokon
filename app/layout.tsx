@@ -4,14 +4,15 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import NavigationProvider from "@/components/NavigationProvider";
 import { Suspense } from "react";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 // METADATA - Fayllaringizni shu yerga bog'laymiz
 export const metadata: Metadata = {
-  title: "Smart Dokon",
-  description: "Biznesni tizimlashtirish",
+  title: "Smart-Dokon.Ai - Biznesni boshqarish AI bilan osonroq",
+  description: "Biznesni boshqarish AI bilan osonroq. Smart-Dokon.Ai orqali biznesni tizimlashtiring, foydangizni oshiring va raqobatchilarni kuzating.",
   // Icons qismi public papkasidagi fayllaringizni brauzerga tushuntiradi
   icons: {
     icon: [
@@ -22,6 +23,23 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   manifest: '/site.webmanifest',
+  // PWA uchun qo'shimcha meta teglar
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Smart-Dokon',
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -36,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </main>
           </NavigationProvider>
         </Suspense>
+        <PWAInstallPrompt />
       </body>
     </html>
   );

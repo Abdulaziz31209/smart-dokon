@@ -94,16 +94,16 @@ function Modal({ open, onClose, title, icon, children, wide = false }: {
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4" onClick={onClose}>
       <div
-        className={`bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] flex flex-col`}
+        className={`bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[92vh] flex flex-col`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-slate-700 flex-shrink-0">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">{icon}{title}</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-700 flex-shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">{icon}{title}</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-xl transition-all"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
-        <div className="overflow-y-auto flex-1 p-6">{children}</div>
+        <div className="overflow-y-auto flex-1 p-4 sm:p-6">{children}</div>
       </div>
     </div>
   )
@@ -112,6 +112,82 @@ function Modal({ open, onClose, title, icon, children, wide = false }: {
 // ─── Input helper ─────────────────────────────────────────────────────────────
 const inp = "w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
 const sel = "w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+
+// ─── Qarz kartasi (mobil uchun) ───────────────────────────────────────────────
+function DebtCard({ d, onEdit, onDelete, onPay }: { d: any; onEdit: () => void; onDelete: () => void; onPay: () => void }) {
+  const rem = d.remaining !== undefined ? d.remaining : (d.amount - (d.paid || 0))
+  const today = new Date(); today.setHours(0,0,0,0)
+  const due = new Date(d.due_date); due.setHours(0,0,0,0)
+  const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  const isOverdue = diffDays < 0 && rem > 0
+  const isSoon    = diffDays >= 0 && diffDays <= 3 && rem > 0
+  const isPaid    = d.status === 'paid' || rem <= 0
+
+  return (
+    <div className={`bg-slate-800 border rounded-2xl p-4 space-y-3 ${isSoon ? 'border-amber-500/50' : isOverdue ? 'border-red-500/50' : isPaid ? 'border-emerald-500/30' : 'border-slate-700'}`}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-bold truncate">{d.customer}</p>
+          <p className="text-slate-500 text-xs">{d.product_name || '—'} {d.qty ? `× ${d.qty}` : ''}</p>
+        </div>
+        <span className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${isPaid ? 'bg-emerald-500/20 text-emerald-400' : isOverdue ? 'bg-red-500/20 text-red-400' : isSoon ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+          {isPaid ? "To'langan" : isOverdue ? 'Kechikkan' : isSoon ? 'Yaqin' : 'Faol'}
+        </span>
+      </div>
+
+      {/* Summa qatori */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="bg-slate-900/60 rounded-xl p-2">
+          <p className="text-slate-500 text-[10px] mb-0.5">Umumiy</p>
+          <p className="text-red-400 font-bold text-sm">{fmt(d.amount)}</p>
+        </div>
+        <div className="bg-slate-900/60 rounded-xl p-2">
+          <p className="text-slate-500 text-[10px] mb-0.5">To'langan</p>
+          <p className="text-emerald-400 font-bold text-sm">{fmt(d.paid || 0)}</p>
+        </div>
+        <div className="bg-slate-900/60 rounded-xl p-2">
+          <p className="text-slate-500 text-[10px] mb-0.5">Qoldiq</p>
+          <p className={`font-bold text-sm ${rem > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{fmt(rem)}</p>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="space-y-1.5 text-xs">
+        {d.phone && (
+          <a href={`tel:${d.phone}`} className="flex items-center gap-2 text-blue-400 hover:underline">
+            <Phone className="w-3 h-3 flex-shrink-0" />{d.phone}
+          </a>
+        )}
+        <div className="flex items-center justify-between text-slate-400">
+          <span>Xodim: {d.employee_name || '—'}</span>
+          <span className={`${isOverdue ? 'text-red-400' : isSoon ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>
+            {isSoon && !isOverdue ? `⏰ ${diffDays === 0 ? 'Bugun!' : `${diffDays} kun`}` : isOverdue ? '⚠️ kechikkan' : new Date(d.due_date).toLocaleDateString('uz-UZ')}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-slate-500">
+          <span>Berilgan: {d.give_date ? new Date(d.give_date).toLocaleDateString('uz-UZ') : '—'}</span>
+          <span>Muddat: {new Date(d.due_date).toLocaleDateString('uz-UZ')}</span>
+        </div>
+      </div>
+
+      {/* Amallar */}
+      <div className="flex gap-2 pt-1 border-t border-slate-700/50">
+        <button onClick={onEdit} className="flex-1 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all">
+          <Edit className="w-3 h-3" />Tahrirlash
+        </button>
+        {rem > 0 && (
+          <button onClick={onPay} className="flex-1 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all">
+            <CheckCircle2 className="w-3 h-3" />To'lash
+          </button>
+        )}
+        <button onClick={onDelete} className="py-2 px-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl text-xs font-semibold flex items-center justify-center transition-all">
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ─── Ana komponent ────────────────────────────────────────────────────────────
 export default function SmartDokon() {
@@ -150,12 +226,11 @@ export default function SmartDokon() {
   const [saleForm, setSaleForm] = useState({ product_id: '', employee_id: '', qty: '1', payment: 'Naqd' })
   const [goalForm, setGoalForm] = useState({ daily: '', weekly: '', monthly: '' })
 
-  // ── YANGILANGAN: Qarz formasi ──────────────────────────────────────────────
   const [debtForm, setDebtForm] = useState({
     customer: '',
     product_id: '',
     qty: '1',
-    amount: 0,          // avtomatik hisoblanadi
+    amount: 0,
     due_date: '',
     give_date: new Date().toISOString().slice(0, 10),
     note: '',
@@ -168,11 +243,8 @@ export default function SmartDokon() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
 
-  // ── YANGI: Qarz eslatma banneri ───────────────────────────────────────────
   const [debtReminders, setDebtReminders] = useState<any[]>([])
   const [showDebtBanner, setShowDebtBanner] = useState(false)
-
-  // Auth prompt
   const [authPrompt, setAuthPrompt] = useState(false)
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
@@ -185,7 +257,6 @@ export default function SmartDokon() {
     init()
   }, [])
 
-  // ── YANGI: Qarz muddati yaqinlashganda eslatma ─────────────────────────────
   useEffect(() => {
     if (debts.length === 0) return
     const today = new Date()
@@ -203,7 +274,6 @@ export default function SmartDokon() {
     if (soon.length > 0) setShowDebtBanner(true)
   }, [debts])
 
-  // Period o'zgarganda real ma'lumotlarni yangilash
   useEffect(() => {
     if (user) {
       fetchAnalytics()
@@ -241,26 +311,16 @@ export default function SmartDokon() {
   }
 
   const fetchProducts = async () => {
-  // 1. Avval foydalanuvchini so'raymiz
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // 2. Agar user kirmagan bo'lsa, pastga tushib o'tirmaymiz
-  if (!user) return;
-
-  // 3. Endi faqat shu userga tegishli mahsulotlarni olamiz
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('user_id', user.id) // <--- Mana bu "oltin kalit"
-    .order('created_at', { ascending: false });
-
-  if (error) { 
-    console.error('Error fetching products:', error); 
-    return; 
-  }
-
-  setProducts(data || []);
-};
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching products:', error); return; }
+    setProducts(data || []);
+  };
 
   const fetchEmployees = async () => {
     const { data, error } = await supabase
@@ -465,8 +525,7 @@ export default function SmartDokon() {
     fetchEmployees()
   }
 
-  // ── YANGILANGAN: Qarz CRUD ─────────────────────────────────────────────────
-  // Mahsulot tanlanganda narxni avtomatik hisoblash
+  // ── Qarz CRUD ─────────────────────────────────────────────────────────────
   const calcDebtAmount = (product_id: string, qty: string) => {
     const prod = products.find(p => String(p.id) === String(product_id))
     return prod ? (prod.price || 0) * (Number(qty) || 1) : 0
@@ -524,7 +583,6 @@ export default function SmartDokon() {
     setSaving(true)
 
     if (!user) {
-      // Demo rejimda lokal update
       if (editDebtItem) {
         setDebts(prev => prev.map(d => d.id === editDebtItem.id ? {
           ...d,
@@ -747,15 +805,15 @@ export default function SmartDokon() {
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast && (
-        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold border transition-all ${toast.type === 'ok' ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-300' : 'bg-red-900/90 border-red-500/50 text-red-300'}`}>
-          {toast.type === 'ok' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          {toast.msg}
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold border transition-all max-w-[90vw] ${toast.type === 'ok' ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-300' : 'bg-red-900/90 border-red-500/50 text-red-300'}`}>
+          {toast.type === 'ok' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+          <span className="truncate">{toast.msg}</span>
         </div>
       )}
 
-      {/* ── YANGI: Qarz muddati eslatma banneri ────────────────────────────── */}
+      {/* ── Qarz muddati eslatma banneri ────────────────────────────────────── */}
       {showDebtBanner && debtReminders.length > 0 && (
-        <div className="fixed top-16 right-4 z-[90] max-w-sm w-full space-y-2">
+        <div className="fixed top-16 right-2 sm:right-4 z-[90] max-w-[calc(100vw-1rem)] sm:max-w-sm w-full space-y-2">
           {debtReminders.map((d: any) => {
             const today = new Date(); today.setHours(0,0,0,0)
             const due = new Date(d.due_date); due.setHours(0,0,0,0)
@@ -765,7 +823,7 @@ export default function SmartDokon() {
               <div key={d.id} className="bg-amber-900/95 border border-amber-500/60 rounded-2xl px-4 py-3 shadow-2xl flex items-start gap-3">
                 <Bell className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-bounce" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-amber-200 font-bold text-sm">{d.customer}</p>
+                  <p className="text-amber-200 font-bold text-sm truncate">{d.customer}</p>
                   <p className="text-amber-300/80 text-xs">
                     {diffDays === 0 ? '⚠️ Bugun muddat tugaydi!' : `⏰ ${diffDays} kun qoldi`} • {fmt(rem)} so'm
                   </p>
@@ -787,104 +845,135 @@ export default function SmartDokon() {
 
       {/* ── Auth Prompt ─────────────────────────────────────────────────────── */}
       {authPrompt && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-blue-700 to-purple-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-blue-400/50">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-blue-700 to-purple-700 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-blue-400/50 max-w-[90vw]">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <div>
             <p className="font-bold text-sm">Kirish talab qilinadi!</p>
             <p className="text-xs opacity-80">Bu funksiya faqat ro'yxatdan o'tganlar uchun</p>
           </div>
-          <Link href="/auth/login" className="ml-3 px-4 py-1.5 bg-white text-blue-700 rounded-lg font-bold text-sm hover:bg-blue-50 transition-all">Kirish</Link>
+          <Link href="/auth/login" className="ml-2 px-3 py-1.5 bg-white text-blue-700 rounded-lg font-bold text-sm hover:bg-blue-50 transition-all whitespace-nowrap">Kirish</Link>
         </div>
       )}
 
-      {/* ── NAV ─────────────────────────────────────────────────────────────── */}
-      <nav className="bg-slate-950 border-b border-slate-800 px-4 py-3 sticky top-0 z-40">
-        <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              {user && profile?.shop_name ? profile.shop_name : 'Aqlli-Dokon'}
-            </h1>
-            <p className="text-slate-500 text-xs">{user ? `@${profile?.username || ''}` : 'Demo rejim'}</p>
+      {/* ══════════════════════════════════════════════════════════════════════
+          NAV — MOBIL UCHUN TO'LIQ QAYTA YOZILDI
+      ══════════════════════════════════════════════════════════════════════ */}
+      <nav className="bg-slate-950 border-b border-slate-800 sticky top-0 z-40">
+        <div className="max-w-[1920px] mx-auto">
+
+          {/* ── 1-qator: Logo + Period + Auth ── */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <h1 className="text-base sm:text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent leading-tight">
+                {user && profile?.shop_name ? profile.shop_name : 'Aqlli-Dokon'}
+              </h1>
+              <p className="text-slate-500 text-[10px] sm:text-xs">{user ? `@${profile?.username || ''}` : 'Demo rejim'}</p>
+            </div>
+
+            {/* Period (o'rta) */}
+            <div className="flex items-center gap-0.5 bg-slate-800 p-0.5 sm:p-1 rounded-xl flex-shrink-0">
+              {PERIODS.map(p => (
+                <button key={p.key} onClick={() => setPeriod(p.key)}
+                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${period === p.key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Auth tugma */}
+            <div className="flex-shrink-0">
+              {user ? (
+                <button onClick={logout} className="p-2 bg-slate-800 hover:bg-red-900/40 rounded-xl transition-all" title="Chiqish">
+                  <LogOut className="w-4 h-4 text-red-400" />
+                </button>
+              ) : (
+                <Link href="/auth/login" className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-xs sm:text-sm transition-all hover:opacity-90 whitespace-nowrap">
+                  Kirish
+                </Link>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl">
-            {PERIODS.map(p => (
-              <button key={p.key} onClick={() => setPeriod(p.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${period === p.key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
+
+          {/* ── 2-qator: Nav tabs + Action tugmalar ── */}
+          <div className="flex items-center gap-1 px-3 pb-2 sm:px-4 overflow-x-auto scrollbar-none">
+            {/* View tabs */}
             {[
-              { k: 'bugun',      icon: <Home       className="w-4 h-4" />, l: 'Bosh'     },
-              { k: 'ombor',      icon: <Package    className="w-4 h-4" />, l: 'Ombor'    },
-              { k: 'xodimlar',   icon: <Users      className="w-4 h-4" />, l: 'Xodimlar' },
-              { k: 'hisobotlar', icon: <FileText   className="w-4 h-4" />, l: 'Hisobot'  },
-              { k: 'qarzlar',    icon: <CreditCard className="w-4 h-4" />, l: 'Qarzlar'  },
+              { k: 'bugun',      icon: <Home       className="w-3.5 h-3.5" />, l: 'Bosh'     },
+              { k: 'ombor',      icon: <Package    className="w-3.5 h-3.5" />, l: 'Ombor'    },
+              { k: 'xodimlar',   icon: <Users      className="w-3.5 h-3.5" />, l: 'Xodimlar' },
+              { k: 'hisobotlar', icon: <FileText   className="w-3.5 h-3.5" />, l: 'Hisobot'  },
+              { k: 'qarzlar',    icon: <CreditCard className="w-3.5 h-3.5" />, l: 'Qarzlar'  },
             ].map(it => (
               <button key={it.k} onClick={() => setView(it.k)}
-                className={`px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-1.5 relative ${view === it.k ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                {it.icon}{it.l}
+                className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm transition-all flex items-center gap-1 sm:gap-1.5 relative flex-shrink-0 ${view === it.k ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                {it.icon}
+                <span className="hidden xs:inline sm:inline">{it.l}</span>
+                <span className="xs:hidden sm:hidden">{it.l.slice(0, 4)}</span>
                 {it.k === 'qarzlar' && debtReminders.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-900 text-[10px] font-black rounded-full flex items-center justify-center">{debtReminders.length}</span>
                 )}
               </button>
             ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={openGoals} title="Maqsadlar" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"><Target className="w-4 h-4 text-amber-400" /></button>
-            <button onClick={openSettings} title="Sozlamalar" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"><Settings className="w-4 h-4 text-slate-300" /></button>
-            <button onClick={openSale} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold flex items-center gap-1.5 text-sm transition-all">
-              <ShoppingCart className="w-4 h-4" />Sotuv
+
+            {/* Separator */}
+            <div className="w-px h-5 bg-slate-700 mx-1 flex-shrink-0" />
+
+            {/* Action tugmalar */}
+            <button onClick={openGoals} title="Maqsadlar" className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all flex-shrink-0">
+              <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
             </button>
-            <button onClick={openAddProduct} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-1.5 text-sm transition-all">
-              <Plus className="w-4 h-4" />Mahsulot
+            <button onClick={openSettings} title="Sozlamalar" className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all flex-shrink-0">
+              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" />
             </button>
-            {user ? (
-              <button onClick={logout} className="p-2 bg-slate-800 hover:bg-red-900/40 rounded-xl transition-all" title="Chiqish"><LogOut className="w-4 h-4 text-red-400" /></button>
-            ) : (
-              <Link href="/auth/login" className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-sm transition-all hover:opacity-90">Kirish</Link>
-            )}
+            <button onClick={openSale} className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm transition-all flex-shrink-0">
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Sotuv</span>
+            </button>
+            <button onClick={openAddProduct} className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm transition-all flex-shrink-0">
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Mahsulot</span>
+            </button>
           </div>
         </div>
       </nav>
 
       {/* Demo banner */}
       {!user && (
-        <div className="bg-amber-900/30 border-b border-amber-700/40 px-4 py-2.5">
-          <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
-            <p className="text-amber-200 text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span><strong>Demo rejim</strong> — barcha ma'lumotlar namunaviy. Haqiqiy ma'lumotlar uchun</span>
+        <div className="bg-amber-900/30 border-b border-amber-700/40 px-3 py-2 sm:px-4 sm:py-2.5">
+          <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-2">
+            <p className="text-amber-200 text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 flex-shrink-0" />
+              <span><strong>Demo rejim</strong> — haqiqiy ma'lumotlar uchun</span>
               <Link href="/auth/signup" className="underline font-bold text-amber-400">ro'yxatdan o'ting</Link>
             </p>
-            <Link href="/auth/signup" className="px-3 py-1 bg-amber-500 text-slate-900 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-amber-400 transition-all">Boshlash →</Link>
+            <Link href="/auth/signup" className="px-2.5 py-1 bg-amber-500 text-slate-900 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-amber-400 transition-all flex-shrink-0">Boshlash →</Link>
           </div>
         </div>
       )}
 
       {/* ── MAIN ────────────────────────────────────────────────────────────── */}
-      <main className="max-w-[1920px] mx-auto p-4 space-y-4">
+      <main className="max-w-[1920px] mx-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
 
         {/* ═══════════════ BUGUN / DASHBOARD VIEW ═══════════════ */}
         {view === 'bugun' && (
           <>
             {goalTarget > 0 && (
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-amber-400" />
-                    <span className="text-white font-bold">{PERIODS.find(p => p.key === period)?.label} Maqsad</span>
-                    <span className="text-amber-400 font-black">{effectiveGoalPct}%</span>
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Target className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 flex-shrink-0" />
+                    <span className="text-white font-bold text-sm sm:text-base truncate">{PERIODS.find(p => p.key === period)?.label} Maqsad</span>
+                    <span className="text-amber-400 font-black text-sm sm:text-base flex-shrink-0">{effectiveGoalPct}%</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-emerald-400 font-bold text-sm">{fmt(effectiveSales)}</span>
-                    <span className="text-slate-500 text-sm"> / {fmt(goalTarget)} so'm</span>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-emerald-400 font-bold text-xs sm:text-sm">{fmt(effectiveSales)}</span>
+                    <span className="text-slate-500 text-xs sm:text-sm"> / {fmt(goalTarget)}</span>
                   </div>
                 </div>
-                <div className="bg-slate-700 rounded-full h-3 overflow-hidden">
+                <div className="bg-slate-700 rounded-full h-2.5 sm:h-3 overflow-hidden">
                   <div
-                    className={`h-3 rounded-full transition-all duration-700 ${effectiveGoalPct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : effectiveGoalPct >= 70 ? 'bg-gradient-to-r from-blue-500 to-cyan-400' : effectiveGoalPct >= 40 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-gradient-to-r from-red-500 to-orange-400'}`}
+                    className={`h-full rounded-full transition-all duration-700 ${effectiveGoalPct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : effectiveGoalPct >= 70 ? 'bg-gradient-to-r from-blue-500 to-cyan-400' : effectiveGoalPct >= 40 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-gradient-to-r from-red-500 to-orange-400'}`}
                     style={{ width: `${effectiveGoalPct}%` }}
                   />
                 </div>
@@ -892,83 +981,83 @@ export default function SmartDokon() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
               {[
-                { label: 'Savdo',        val: `${fmt(effectiveSales)} so'm`,      icon: <DollarSign  className="w-5 h-5 text-emerald-400" />, bg: 'bg-emerald-500/15', sub: period === 'today' ? `${fmt(effectiveTxCount)} ta tranzaksiya` : period === 'week' ? `7 kunlik ko'rsatkich` : `30 kunlik ko'rsatkich`, subColor: 'text-emerald-400' },
-                { label: 'Foyda',        val: `${fmt(effectiveProfit)} so'm`,     icon: <TrendingUp  className="w-5 h-5 text-blue-400" />,    bg: 'bg-blue-500/15',    sub: `Marja: ${effectiveMargin}%`, subColor: 'text-blue-400' },
-                { label: 'Tranzaksiya',  val: `${fmt(effectiveTxCount)} ta`,      icon: <ShoppingCart className="w-5 h-5 text-purple-400" />, bg: 'bg-purple-500/15',  sub: `O'rtacha: ${fmt(effectiveAvgCheck)} so'm`, subColor: 'text-purple-400' },
-                { label: 'Ombor qiymati', val: `${fmt(totalValue)} so'm`,         icon: <Package     className="w-5 h-5 text-indigo-400" />, bg: 'bg-indigo-500/15',  sub: `${products.length} xil mahsulot`, subColor: 'text-indigo-400' },
-                { label: 'Kam zaxira',   val: `${lowStock.length} ta`,            icon: <AlertCircle className="w-5 h-5 text-orange-400" />, bg: 'bg-orange-500/15',  sub: 'Diqqat talab qiladi', subColor: 'text-orange-400' },
+                { label: 'Savdo',        val: `${fmt(effectiveSales)} so'm`,      icon: <DollarSign  className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />, bg: 'bg-emerald-500/15', sub: period === 'today' ? `${fmt(effectiveTxCount)} ta tranzaksiya` : period === 'week' ? `7 kunlik` : `30 kunlik`, subColor: 'text-emerald-400' },
+                { label: 'Foyda',        val: `${fmt(effectiveProfit)} so'm`,     icon: <TrendingUp  className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />,    bg: 'bg-blue-500/15',    sub: `Marja: ${effectiveMargin}%`, subColor: 'text-blue-400' },
+                { label: 'Tranzaksiya',  val: `${fmt(effectiveTxCount)} ta`,      icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />, bg: 'bg-purple-500/15',  sub: `O'rtacha: ${fmt(effectiveAvgCheck)}`, subColor: 'text-purple-400' },
+                { label: 'Ombor',        val: `${fmt(totalValue)} so'm`,          icon: <Package     className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />, bg: 'bg-indigo-500/15',  sub: `${products.length} xil mahsulot`, subColor: 'text-indigo-400' },
+                { label: 'Kam zaxira',   val: `${lowStock.length} ta`,            icon: <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />, bg: 'bg-orange-500/15',  sub: 'Diqqat talab qiladi', subColor: 'text-orange-400' },
               ].map((kpi, i) => (
-                <div key={i} className="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-2xl p-4 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`p-2 ${kpi.bg} rounded-xl`}>{kpi.icon}</div>
-                    {!user && <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">DEMO</span>}
+                <div key={i} className="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-2xl p-3 sm:p-4 transition-all">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <div className={`p-1.5 sm:p-2 ${kpi.bg} rounded-xl`}>{kpi.icon}</div>
+                    {!user && <span className="text-[10px] sm:text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">DEMO</span>}
                   </div>
-                  <p className="text-slate-400 text-xs mb-1">{kpi.label}</p>
-                  <p className="text-white font-black text-lg leading-tight mb-1">{kpi.val}</p>
-                  <p className={`text-xs ${kpi.subColor}`}>{kpi.sub}</p>
+                  <p className="text-slate-400 text-[10px] sm:text-xs mb-1">{kpi.label}</p>
+                  <p className="text-white font-black text-sm sm:text-lg leading-tight mb-1">{kpi.val}</p>
+                  <p className={`text-[10px] sm:text-xs ${kpi.subColor} truncate`}>{kpi.sub}</p>
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-              <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-5">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4">
+              <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-400" />Haftalik Savdo</h3>
+                  <h3 className="font-bold text-white flex items-center gap-2 text-sm sm:text-base"><BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />Haftalik Savdo</h3>
                   {!user && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold">DEMO</span>}
                 </div>
-                <div className="h-48 flex items-end gap-2">
+                <div className="h-36 sm:h-48 flex items-end gap-1 sm:gap-2">
                   {WEEK_CHART.map(item => {
                     const h = Math.round((item.v / Math.max(...WEEK_CHART.map(c => c.v), 1)) * 100)
                     return (
-                      <div key={item.day} className="flex-1 flex flex-col items-center gap-1.5">
-                        <div className="w-full relative group flex items-end" style={{ height: '160px' }}>
+                      <div key={item.day} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="w-full relative group flex items-end" style={{ height: '120px' }}>
                           <div className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg hover:from-blue-400 hover:to-cyan-400 transition-all cursor-pointer" style={{ height: `${h}%` }} />
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-slate-950 border border-slate-700 px-2 py-1 rounded-lg text-xs whitespace-nowrap z-10 pointer-events-none">
                             <p className="text-white font-bold">{fmt(item.v)} so'm</p>
                           </div>
                         </div>
-                        <span className="text-xs text-slate-500">{item.day}</span>
+                        <span className="text-[10px] sm:text-xs text-slate-500">{item.day}</span>
                       </div>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><Star className="w-5 h-5 text-amber-400" />Top Mahsulotlar</h3>
+                  <h3 className="font-bold text-white flex items-center gap-2 text-sm sm:text-base"><Star className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />Top Mahsulotlar</h3>
                   {!user && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold">DEMO</span>}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   {[...products].sort((a, b) => (b[soldKey] || 0) - (a[soldKey] || 0)).slice(0, 6).map((p, i) => (
-                    <div key={p.id} className="flex items-center gap-3 p-2 hover:bg-slate-700/50 rounded-xl transition-all">
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 ${i === 0 ? 'bg-amber-500 text-slate-900' : i === 1 ? 'bg-slate-400 text-slate-900' : i === 2 ? 'bg-amber-700 text-white' : 'bg-slate-700 text-slate-400'}`}>{i+1}</div>
+                    <div key={p.id} className="flex items-center gap-2 sm:gap-3 p-2 hover:bg-slate-700/50 rounded-xl transition-all">
+                      <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center text-[10px] sm:text-xs font-black flex-shrink-0 ${i === 0 ? 'bg-amber-500 text-slate-900' : i === 1 ? 'bg-slate-400 text-slate-900' : i === 2 ? 'bg-amber-700 text-white' : 'bg-slate-700 text-slate-400'}`}>{i+1}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">{p.name}</p>
-                        <p className="text-emerald-400 text-xs">{fmt((p[soldKey] || 0) * p.price)} so'm</p>
+                        <p className="text-white text-xs sm:text-sm font-semibold truncate">{p.name}</p>
+                        <p className="text-emerald-400 text-[10px] sm:text-xs">{fmt((p[soldKey] || 0) * p.price)} so'm</p>
                       </div>
-                      <span className="text-slate-400 text-xs flex-shrink-0">{p[soldKey] || 0} ta</span>
+                      <span className="text-slate-400 text-[10px] sm:text-xs flex-shrink-0">{p[soldKey] || 0} ta</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-              <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-5">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4">
+              <div className="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><Clock className="w-5 h-5 text-blue-400" />So'nggi Sotuvlar</h3>
+                  <h3 className="font-bold text-white flex items-center gap-2 text-sm sm:text-base"><Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />So'nggi Sotuvlar</h3>
                   <div className="flex items-center gap-2">
                     {!user && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold">DEMO</span>}
-                    <span className="text-xs text-slate-400">Jami: {DEMO_SALES.length} ta</span>
+                    <span className="text-xs text-slate-400">{DEMO_SALES.length} ta</span>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[500px] text-sm">
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <table className="w-full min-w-[480px] text-sm">
                     <thead><tr className="border-b border-slate-700">
-                      {['Vaqt', 'Xaridor', 'Mahsulotlar', 'Narx', "To'lov", 'Sotuvchi'].map(h => (
+                      {['Vaqt', 'Xaridor', 'Dona', 'Narx', "To'lov", 'Sotuvchi'].map(h => (
                         <th key={h} className="pb-2 text-left text-xs text-slate-400 font-semibold px-2">{h}</th>
                       ))}
                     </tr></thead>
@@ -976,21 +1065,21 @@ export default function SmartDokon() {
                       {DEMO_SALES.map(s => (
                         <tr key={s.id} className="hover:bg-slate-700/30 transition-all">
                           <td className="py-2 px-2 font-mono text-slate-400 text-xs">{s.time}</td>
-                          <td className="py-2 px-2 text-slate-300">{s.customer}</td>
-                          <td className="py-2 px-2 text-slate-400 text-xs">{s.items} dona</td>
-                          <td className="py-2 px-2 text-emerald-400 font-bold">{fmt(s.total)} so'm</td>
+                          <td className="py-2 px-2 text-slate-300 text-xs">{s.customer}</td>
+                          <td className="py-2 px-2 text-slate-400 text-xs">{s.items}</td>
+                          <td className="py-2 px-2 text-emerald-400 font-bold text-xs">{fmt(s.total)}</td>
                           <td className="py-2 px-2">
-                            <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${s.payment === 'Naqd' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>{s.payment}</span>
+                            <span className={`px-1.5 py-0.5 rounded-lg text-xs font-semibold ${s.payment === 'Naqd' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>{s.payment}</span>
                           </td>
-                          <td className="py-2 px-2 text-slate-400">{s.seller}</td>
+                          <td className="py-2 px-2 text-slate-400 text-xs">{s.seller}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="border-t border-slate-700">
                       <tr className="bg-slate-900/50">
-                        <td colSpan={2} className="py-3 px-2 text-slate-300 font-bold">Jami:</td>
-                        <td className="py-3 px-2 text-slate-300 font-bold">{DEMO_SALES.reduce((a, s) => a + s.items, 0)} dona</td>
-                        <td className="py-3 px-2 text-emerald-400 font-black">{fmt(DEMO_SALES.reduce((a, s) => a + s.total, 0))} so'm</td>
+                        <td colSpan={2} className="py-2.5 px-2 text-slate-300 font-bold text-xs">Jami:</td>
+                        <td className="py-2.5 px-2 text-slate-300 font-bold text-xs">{DEMO_SALES.reduce((a, s) => a + s.items, 0)}</td>
+                        <td className="py-2.5 px-2 text-emerald-400 font-black text-xs">{fmt(DEMO_SALES.reduce((a, s) => a + s.total, 0))}</td>
                         <td colSpan={2}></td>
                       </tr>
                     </tfoot>
@@ -998,9 +1087,9 @@ export default function SmartDokon() {
                 </div>
               </div>
 
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                <h3 className="font-bold text-white flex items-center gap-2 mb-4">
-                  <AlertCircle className="w-5 h-5 text-red-400" />Kam Zaxira
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
+                <h3 className="font-bold text-white flex items-center gap-2 mb-4 text-sm sm:text-base">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />Kam Zaxira
                   {lowStock.length > 0 && <span className="ml-auto bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full font-bold">{lowStock.length}</span>}
                 </h3>
                 {lowStock.length === 0 ? (
@@ -1012,12 +1101,12 @@ export default function SmartDokon() {
                   <div className="space-y-2">
                     {lowStock.slice(0, 6).map(p => (
                       <div key={p.id} className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-xl">
-                        <div>
-                          <p className="text-white text-sm font-semibold">{p.name}</p>
-                          <p className="text-red-400 text-xs">Min: {p.min_stock_level} dona</p>
+                        <div className="min-w-0 flex-1 pr-2">
+                          <p className="text-white text-xs sm:text-sm font-semibold truncate">{p.name}</p>
+                          <p className="text-red-400 text-xs">Min: {p.min_stock_level}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-red-400 font-black">{p.stock}</p>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-red-400 font-black text-sm sm:text-base">{p.stock}</p>
                           <p className="text-slate-500 text-xs">qoldi</p>
                         </div>
                       </div>
@@ -1027,15 +1116,15 @@ export default function SmartDokon() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
               {[
-                { label: 'Daromad', val: fmt(effectiveSales),  sub: 'so\'m', icon: <DollarSign   className="w-5 h-5 text-emerald-400" />, color: 'text-emerald-400' },
-                { label: 'Foyda',   val: fmt(effectiveProfit), sub: 'so\'m', icon: <Award        className="w-5 h-5 text-blue-400" />,    color: 'text-blue-400'    },
-                { label: 'Xarajat', val: fmt(effectiveCost),   sub: 'so\'m', icon: <TrendingDown className="w-5 h-5 text-red-400" />,     color: 'text-red-400'     },
+                { label: 'Daromad', val: fmt(effectiveSales),  sub: 'so\'m', icon: <DollarSign   className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />, color: 'text-emerald-400' },
+                { label: 'Foyda',   val: fmt(effectiveProfit), sub: 'so\'m', icon: <Award        className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />,    color: 'text-blue-400'    },
+                { label: 'Xarajat', val: fmt(effectiveCost),   sub: 'so\'m', icon: <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />,     color: 'text-red-400'     },
               ].map((item, i) => (
-                <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-2">{item.icon}<p className="text-slate-400 text-sm">{item.label}</p></div>
-                  <p className={`text-3xl font-black ${item.color}`}>{item.val} <span className="text-lg text-slate-500">{item.sub}</span></p>
+                <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-2">{item.icon}<p className="text-slate-400 text-xs sm:text-sm">{item.label}</p></div>
+                  <p className={`text-2xl sm:text-3xl font-black ${item.color}`}>{item.val} <span className="text-base sm:text-lg text-slate-500">{item.sub}</span></p>
                   {!user && <span className="text-xs text-amber-500/70">Demo ma'lumot</span>}
                 </div>
               ))}
@@ -1046,17 +1135,18 @@ export default function SmartDokon() {
         {/* ═══════════════ OMBOR VIEW ═══════════════ */}
         {view === 'ombor' && (
           <>
-            <div className="flex gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="flex gap-2 sm:gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[160px]">
                 <Search className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
                 <input type="text" placeholder="Qidirish..." className={`${inp} pl-9`} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <button onClick={openAddProduct} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-2 text-sm transition-all">
-                <Plus className="w-4 h-4" />Yangi Mahsulot
+              <button onClick={openAddProduct} className="px-3 sm:px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm transition-all">
+                <Plus className="w-4 h-4" /><span className="hidden sm:inline">Yangi </span>Mahsulot
               </button>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+            {/* Mobilda karta ko'rinish, desktopda jadval */}
+            <div className="hidden sm:block bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead className="bg-slate-900 border-b border-slate-700">
@@ -1106,6 +1196,50 @@ export default function SmartDokon() {
                 </table>
               </div>
             </div>
+
+            {/* Mobil: karta ko'rinish */}
+            <div className="sm:hidden space-y-2">
+              {loading ? (
+                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-400 mx-auto" /></div>
+              ) : filteredProds.length === 0 ? (
+                <div className="py-12 text-center text-slate-500">Mahsulot topilmadi</div>
+              ) : filteredProds.map(p => (
+                <div key={p.id} className={`bg-slate-800 border rounded-2xl p-3 ${(p.stock || 0) <= (p.min_stock_level || 10) ? 'border-red-500/40' : 'border-slate-700'}`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0">{p.name?.charAt(0)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-white truncate">{p.name}</p>
+                      <p className="text-slate-500 text-xs">{p.category || '-'} {p.sku ? `• ${p.sku}` : ''}</p>
+                    </div>
+                    <button onClick={() => toggleProductActive(p)}>
+                      {p.active !== false ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div className="bg-slate-900/60 rounded-xl p-2">
+                      <p className="text-slate-500 text-[10px]">Narx</p>
+                      <p className="text-emerald-400 font-bold text-sm">{fmt(p.price)}</p>
+                    </div>
+                    <div className="bg-slate-900/60 rounded-xl p-2">
+                      <p className="text-slate-500 text-[10px]">Zaxira</p>
+                      <p className={`font-bold text-sm ${(p.stock || 0) <= (p.min_stock_level || 10) ? 'text-red-400' : 'text-blue-400'}`}>{p.stock}</p>
+                    </div>
+                    <div className="bg-slate-900/60 rounded-xl p-2">
+                      <p className="text-slate-500 text-[10px]">Bugun</p>
+                      <p className="text-cyan-400 font-bold text-sm">{p.sold_today || 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEditProduct(p)} className="flex-1 py-2 bg-blue-600/20 text-blue-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1">
+                      <Edit className="w-3 h-3" />Tahrirlash
+                    </button>
+                    <button onClick={() => deleteProduct(p.id)} className="py-2 px-3 bg-red-600/20 text-red-400 rounded-xl text-xs">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
 
@@ -1113,13 +1247,13 @@ export default function SmartDokon() {
         {view === 'xodimlar' && (
           <>
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-blue-400" />Xodimlar ({employees.length})</h2>
-              <button onClick={openAddEmployee} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-2 text-sm transition-all">
+              <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2"><Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />Xodimlar ({employees.length})</h2>
+              <button onClick={openAddEmployee} className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm transition-all">
                 <UserPlus className="w-4 h-4" />Xodim qo'shish
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {employees.length === 0 ? (
                 <div className="col-span-3 text-center py-16 bg-slate-800 rounded-2xl border border-slate-700">
                   <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
@@ -1127,15 +1261,15 @@ export default function SmartDokon() {
                   <button onClick={openAddEmployee} className="mt-4 px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all">Xodim qo'shish</button>
                 </div>
               ) : employees.map(emp => (
-                <div key={emp.id} className={`bg-slate-800 border rounded-2xl p-5 transition-all ${emp.is_active !== false ? 'border-slate-700 hover:border-blue-500/50' : 'border-slate-700/50 opacity-60'}`}>
+                <div key={emp.id} className={`bg-slate-800 border rounded-2xl p-4 sm:p-5 transition-all ${emp.is_active !== false ? 'border-slate-700 hover:border-blue-500/50' : 'border-slate-700/50 opacity-60'}`}>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 bg-gradient-to-br ${emp.avatar_color || 'from-blue-500 to-purple-600'} rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0`}>
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${emp.avatar_color || 'from-blue-500 to-purple-600'} rounded-xl flex items-center justify-center font-black text-base sm:text-lg flex-shrink-0`}>
                         {emp.name?.split(' ').slice(0, 2).map((n: string) => n[0]).join('') || '?'}
                       </div>
                       <div>
-                        <h3 className="text-white font-bold">{emp.name}</h3>
-                        <p className="text-slate-400 text-sm">{emp.position}</p>
+                        <h3 className="text-white font-bold text-sm sm:text-base">{emp.name}</h3>
+                        <p className="text-slate-400 text-xs sm:text-sm">{emp.position}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -1148,34 +1282,34 @@ export default function SmartDokon() {
                   </div>
 
                   <div className="space-y-1.5 text-sm mb-4">
-                    {emp.phone && <div className="flex items-center gap-2 text-slate-300"><Phone className="w-3.5 h-3.5 text-slate-500" />{emp.phone}</div>}
-                    {emp.email && <div className="flex items-center gap-2 text-slate-300"><Mail  className="w-3.5 h-3.5 text-slate-500" />{emp.email}</div>}
-                    {emp.salary > 0 && <div className="flex items-center gap-2 text-slate-300"><DollarSign className="w-3.5 h-3.5 text-slate-500" />Maosh: <span className="font-bold text-white">{fmt(emp.salary)} so'm</span></div>}
+                    {emp.phone && <div className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm"><Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />{emp.phone}</div>}
+                    {emp.email && <div className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm"><Mail  className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" /><span className="truncate">{emp.email}</span></div>}
+                    {emp.salary > 0 && <div className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm"><DollarSign className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />Maosh: <span className="font-bold text-white">{fmt(emp.salary)} so'm</span></div>}
                   </div>
 
                   {(emp.sales_today > 0 || emp.performance > 0) && (
                     <div className="border-t border-slate-700 pt-3 space-y-2">
                       {emp.sales_today > 0 && (
-                        <div className="flex justify-between text-sm">
+                        <div className="flex justify-between text-xs sm:text-sm">
                           <span className="text-slate-400">Bugungi savdo</span>
                           <span className="text-emerald-400 font-bold">{fmt(emp.sales_today)} so'm</span>
                         </div>
                       )}
                       {emp.sales_month > 0 && (
-                        <div className="flex justify-between text-sm">
+                        <div className="flex justify-between text-xs sm:text-sm">
                           <span className="text-slate-400">Oylik savdo</span>
                           <span className="text-blue-400 font-bold">{fmt(emp.sales_month)} so'm</span>
                         </div>
                       )}
                       {emp.sales_goal > 0 && (
-                        <div className="flex justify-between text-sm">
+                        <div className="flex justify-between text-xs sm:text-sm">
                           <span className="text-slate-400">Kunlik maqsad</span>
                           <span className="text-amber-400 font-bold">{fmt(emp.sales_goal)} so'm</span>
                         </div>
                       )}
                       {emp.performance > 0 && (
                         <>
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-slate-400">Performance</span>
                             <span className="text-purple-400 font-bold">{emp.performance}%</span>
                           </div>
@@ -1205,38 +1339,38 @@ export default function SmartDokon() {
         {/* ═══════════════ HISOBOTLAR VIEW ═══════════════ */}
         {view === 'hisobotlar' && (
           <>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-400" />Hisobotlar</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2"><FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />Hisobotlar</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4">
               {[
-                { label: 'Jami Savdo',     val: fmt(effectiveSales),       sub: 'so\'m', color: 'text-emerald-400', icon: <DollarSign   className="w-6 h-6" /> },
-                { label: 'Jami Foyda',     val: fmt(effectiveProfit),      sub: 'so\'m', color: 'text-blue-400',    icon: <Award        className="w-6 h-6" /> },
-                { label: 'Foyda Marja',    val: effectiveMargin,           sub: '%',     color: 'text-purple-400',  icon: <Percent      className="w-6 h-6" /> },
-                { label: 'Savdo soni',     val: fmt(effectiveTxCount),     sub: 'ta',    color: 'text-cyan-400',    icon: <ShoppingCart className="w-6 h-6" /> },
-                { label: 'O\'rtacha chek', val: fmt(effectiveAvgCheck),    sub: 'so\'m', color: 'text-amber-400',   icon: <CreditCard   className="w-6 h-6" /> },
-                { label: 'Ombor qiymati',  val: fmt(totalValue),           sub: 'so\'m', color: 'text-indigo-400',  icon: <Package      className="w-6 h-6" /> },
-                { label: 'Mahsulotlar',    val: String(products.length),   sub: 'tur',   color: 'text-teal-400',    icon: <Hash         className="w-6 h-6" /> },
-                { label: 'Xodimlar',       val: String(employees.filter(e => e.is_active !== false).length), sub: 'aktiv', color: 'text-rose-400', icon: <Users className="w-6 h-6" /> },
+                { label: 'Jami Savdo',     val: fmt(effectiveSales),       sub: 'so\'m', color: 'text-emerald-400', icon: <DollarSign   className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Jami Foyda',     val: fmt(effectiveProfit),      sub: 'so\'m', color: 'text-blue-400',    icon: <Award        className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Foyda Marja',    val: effectiveMargin,           sub: '%',     color: 'text-purple-400',  icon: <Percent      className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Savdo soni',     val: fmt(effectiveTxCount),     sub: 'ta',    color: 'text-cyan-400',    icon: <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'O\'rtacha chek', val: fmt(effectiveAvgCheck),    sub: 'so\'m', color: 'text-amber-400',   icon: <CreditCard   className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Ombor qiymati',  val: fmt(totalValue),           sub: 'so\'m', color: 'text-indigo-400',  icon: <Package      className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Mahsulotlar',    val: String(products.length),   sub: 'tur',   color: 'text-teal-400',    icon: <Hash         className="w-5 h-5 sm:w-6 sm:h-6" /> },
+                { label: 'Xodimlar',       val: String(employees.filter(e => e.is_active !== false).length), sub: 'aktiv', color: 'text-rose-400', icon: <Users className="w-5 h-5 sm:w-6 sm:h-6" /> },
               ].map((item, i) => (
-                <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-5 hover:border-slate-600 transition-all">
-                  <div className="flex items-center gap-3 mb-3 text-slate-500">{item.icon}<span className="text-sm">{item.label}</span></div>
-                  <p className={`text-3xl font-black ${item.color}`}>{item.val} <span className="text-slate-500 text-base font-normal">{item.sub}</span></p>
+                <div key={i} className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-5 hover:border-slate-600 transition-all">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 text-slate-500">{item.icon}<span className="text-xs sm:text-sm">{item.label}</span></div>
+                  <p className={`text-xl sm:text-3xl font-black ${item.color}`}>{item.val} <span className="text-slate-500 text-sm sm:text-base font-normal">{item.sub}</span></p>
                 </div>
               ))}
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-              <h3 className="font-bold text-white mb-4 flex items-center gap-2"><LineChart className="w-5 h-5 text-purple-400" />Davr Taqqoslashi</h3>
-              <div className="grid grid-cols-3 gap-4">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 sm:p-5">
+              <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm sm:text-base"><LineChart className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />Davr Taqqoslashi</h3>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
                 {PERIODS.map(p => {
                   const k = p.key === 'today' ? 'sold_today' : p.key === 'week' ? 'sold_week' : 'sold_month'
                   const s = products.reduce((a, pr) => a + (pr[k] || 0) * (pr.price || 0), 0)
                   const prof = products.reduce((a, pr) => a + (pr[k] || 0) * ((pr.price || 0) - (pr.cost || pr.price * 0.7 || 0)), 0)
                   return (
-                    <div key={p.key} className={`p-4 rounded-xl border transition-all cursor-pointer ${period === p.key ? 'bg-blue-600/20 border-blue-500/50' : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'}`} onClick={() => setPeriod(p.key)}>
-                      <p className="text-slate-400 text-sm mb-2">{p.label}</p>
-                      <p className="text-white font-black text-xl">{fmt(s)} <span className="text-slate-500 text-sm font-normal">so'm</span></p>
-                      <p className="text-emerald-400 text-sm mt-1">Foyda: {fmt(prof)}</p>
+                    <div key={p.key} className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${period === p.key ? 'bg-blue-600/20 border-blue-500/50' : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'}`} onClick={() => setPeriod(p.key)}>
+                      <p className="text-slate-400 text-xs sm:text-sm mb-1 sm:mb-2">{p.label}</p>
+                      <p className="text-white font-black text-sm sm:text-xl">{fmt(s)} <span className="text-slate-500 text-xs sm:text-sm font-normal">so'm</span></p>
+                      <p className="text-emerald-400 text-xs mt-0.5 sm:mt-1">Foyda: {fmt(prof)}</p>
                     </div>
                   )
                 })}
@@ -1244,42 +1378,62 @@ export default function SmartDokon() {
             </div>
 
             {!user && (
-              <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/40 rounded-2xl p-8 text-center">
-                <FileText className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-                <h3 className="text-xl font-bold text-white mb-2">Batafsil Hisobotlar</h3>
-                <p className="text-slate-400 mb-4">To'liq moliyaviy tahlil va eksport funksiyasi uchun ro'yxatdan o'ting</p>
-                <Link href="/auth/signup" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all">Ro'yxatdan o'tish</Link>
+              <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/40 rounded-2xl p-6 sm:p-8 text-center">
+                <FileText className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400 mx-auto mb-3" />
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Batafsil Hisobotlar</h3>
+                <p className="text-slate-400 text-sm mb-4">To'liq moliyaviy tahlil uchun ro'yxatdan o'ting</p>
+                <Link href="/auth/signup" className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all text-sm">Ro'yxatdan o'tish</Link>
               </div>
             )}
           </>
         )}
 
-        {/* ═══════════════ QARZLAR VIEW ═══════════════ */}
+        {/* ═══════════════ QARZLAR VIEW — MOBIL UCHUN TO'LIQ QAYTA YOZILDI ═══════════════ */}
         {view === 'qarzlar' && (
           <>
-            {/* Qarz eslatma banneri - qarzlar sahifasida ham ko'rsatish */}
             {debtReminders.length > 0 && (
-              <div className="bg-amber-900/30 border border-amber-600/40 rounded-2xl p-4 flex items-center gap-3">
-                <Bell className="w-5 h-5 text-amber-400 flex-shrink-0 animate-bounce" />
-                <div className="flex-1">
-                  <p className="text-amber-200 font-bold text-sm">⚠️ {debtReminders.length} ta qarz muddati yaqinlashdi!</p>
-                  <p className="text-amber-300/70 text-xs">{debtReminders.map((d: any) => d.customer).join(', ')}</p>
+              <div className="bg-amber-900/30 border border-amber-600/40 rounded-2xl p-3 sm:p-4 flex items-center gap-3">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 flex-shrink-0 animate-bounce" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-amber-200 font-bold text-xs sm:text-sm">⚠️ {debtReminders.length} ta qarz muddati yaqinlashdi!</p>
+                  <p className="text-amber-300/70 text-xs truncate">{debtReminders.map((d: any) => d.customer).join(', ')}</p>
                 </div>
-                <button onClick={() => setView('qarzlar')} className="px-3 py-1.5 bg-amber-500 text-slate-900 rounded-lg text-xs font-bold">Ko'rish</button>
               </div>
             )}
 
-            <div className="flex gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="flex gap-2 sm:gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[160px]">
                 <Search className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-                <input type="text" placeholder="Xaridor bo'yicha qidirish..." className={`${inp} pl-9`} value={search} onChange={e => setSearch(e.target.value)} />
+                <input type="text" placeholder="Xaridor bo'yicha..." className={`${inp} pl-9`} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <button onClick={openAddDebt} className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold flex items-center gap-2 text-sm transition-all">
-                <Plus className="w-4 h-4" />Yangi Qarz
+              <button onClick={openAddDebt} className="px-3 sm:px-4 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold flex items-center gap-1.5 text-xs sm:text-sm transition-all">
+                <Plus className="w-4 h-4" /><span className="hidden sm:inline">Yangi </span>Qarz
               </button>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+            {/* Mobilda karta ko'rinish */}
+            <div className="sm:hidden space-y-2">
+              {debts.filter((d: any) => d.customer.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
+                <div className="py-12 text-center text-slate-500 bg-slate-800 rounded-2xl border border-slate-700">Qarz topilmadi</div>
+              ) : debts.filter((d: any) => d.customer.toLowerCase().includes(search.toLowerCase())).map((d: any) => (
+                <DebtCard
+                  key={d.id}
+                  d={d}
+                  onEdit={() => openEditDebt(d)}
+                  onDelete={() => deleteDebt(d.id)}
+                  onPay={() => handlePayDebt(d.id)}
+                />
+              ))}
+
+              {/* Jami qoldiq */}
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 flex items-center justify-between">
+                <span className="text-slate-300 font-bold text-sm">Jami qoldiq qarz:</span>
+                <span className="text-red-400 font-black">{fmt(debts.reduce((sum: number, d: any) => sum + (d.remaining !== undefined ? d.remaining : d.amount - (d.paid||0)), 0))} so'm</span>
+              </div>
+            </div>
+
+            {/* Desktopda jadval ko'rinish */}
+            <div className="hidden sm:block bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1000px] text-sm">
                   <thead className="bg-slate-900 border-b border-slate-700">
@@ -1385,11 +1539,11 @@ export default function SmartDokon() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Sotuv Narxi (so'm) *</label>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Sotuv Narxi *</label>
               <input className={inp} type="number" placeholder="8000" value={prodForm.price} onChange={e => setProdForm(f => ({...f, price: e.target.value}))} />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Tannarx (so'm)</label>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Tannarx</label>
               <input className={inp} type="number" placeholder="5500" value={prodForm.cost} onChange={e => setProdForm(f => ({...f, cost: e.target.value}))} />
             </div>
             <div>
@@ -1439,7 +1593,7 @@ export default function SmartDokon() {
             </div>
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Kunlik savdo maqsadi (so'm)</label>
+            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Kunlik savdo maqsadi</label>
             <input className={inp} type="number" placeholder="5000000" value={empForm.sales_goal} onChange={e => setEmpForm(f => ({...f, sales_goal: e.target.value}))} />
           </div>
           <div>
@@ -1500,7 +1654,7 @@ export default function SmartDokon() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-400">Narx:</span>
-                      <span className="text-white font-bold">{fmt(prod?.price || 0)} so'm × {saleForm.qty}</span>
+                      <span className="text-white font-bold">{fmt(prod?.price || 0)} × {saleForm.qty}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-sm">Jami:</span>
@@ -1526,15 +1680,15 @@ export default function SmartDokon() {
       <Modal open={modal === 'goals'} onClose={() => setModal(null)}
         title="Savdo Maqsadlari" icon={<Target className="w-5 h-5 text-amber-400" />}>
         <div className="space-y-4">
-          <p className="text-slate-400 text-sm">Har bir davr uchun savdo maqsadini kiriting. Progress bosh sahifada ko'rinadi.</p>
+          <p className="text-slate-400 text-sm">Har bir davr uchun savdo maqsadini kiriting.</p>
           {[
             { label: 'Kunlik Maqsad',   key: 'daily',   ph: '15 000 000',  cur: goals.daily   },
             { label: 'Haftalik Maqsad', key: 'weekly',  ph: '100 000 000', cur: goals.weekly  },
             { label: 'Oylik Maqsad',    key: 'monthly', ph: '400 000 000', cur: goals.monthly },
           ].map(item => (
             <div key={item.key}>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block flex items-center justify-between">
-                {item.label}
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 flex items-center justify-between">
+                <span>{item.label}</span>
                 <span className="text-slate-600 normal-case font-normal">Hozir: {fmt(item.cur)} so'm</span>
               </label>
               <input className={inp} type="number" placeholder={item.ph}
@@ -1548,19 +1702,15 @@ export default function SmartDokon() {
         </div>
       </Modal>
 
-      {/* ═══════════════ YANGILANGAN: Qarz qo'shish/tahrirlash modali ═══════════════ */}
+      {/* Qarz qo'shish/tahrirlash modali */}
       <Modal open={modal === 'debt'} onClose={() => setModal(null)}
         title={editDebtItem ? 'Qarzni Tahrirlash' : 'Yangi Qarz Qo\'shish'}
         icon={<CreditCard className="w-5 h-5 text-rose-400" />} wide>
         <div className="space-y-4">
-
-          {/* Xaridor ismi */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Xaridor nomi *</label>
             <input className={inp} placeholder="Xaridor ism yoki do'kon" value={debtForm.customer} onChange={e => setDebtForm(f => ({...f, customer: e.target.value}))} />
           </div>
-
-          {/* Xodim tanlash */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Qarzga bergan xodim *</label>
             <select className={sel} value={debtForm.employee_id}
@@ -1571,18 +1721,12 @@ export default function SmartDokon() {
               ))}
             </select>
           </div>
-
-          {/* Mahsulot tanlash */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Mahsulot *</label>
             <select className={sel} value={debtForm.product_id}
               onChange={e => {
                 const pid = e.target.value
-                setDebtForm(f => ({
-                  ...f,
-                  product_id: pid,
-                  amount: calcDebtAmount(pid, f.qty)
-                }))
+                setDebtForm(f => ({ ...f, product_id: pid, amount: calcDebtAmount(pid, f.qty) }))
               }}>
               <option value="">Mahsulotni tanlang...</option>
               {products.filter(p => p.active !== false).map(p => (
@@ -1590,19 +1734,13 @@ export default function SmartDokon() {
               ))}
             </select>
           </div>
-
-          {/* Miqdor va avtomatik summa */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Miqdor (dona) *</label>
               <input className={inp} type="number" min="1" placeholder="1" value={debtForm.qty}
                 onChange={e => {
                   const qty = e.target.value
-                  setDebtForm(f => ({
-                    ...f,
-                    qty,
-                    amount: calcDebtAmount(f.product_id, qty)
-                  }))
+                  setDebtForm(f => ({ ...f, qty, amount: calcDebtAmount(f.product_id, qty) }))
                 }} />
             </div>
             <div>
@@ -1610,26 +1748,22 @@ export default function SmartDokon() {
               <div className={`${inp} bg-slate-800 cursor-not-allowed flex items-center`}>
                 {debtForm.amount > 0
                   ? <span className="text-emerald-400 font-bold">{fmt(debtForm.amount)} so'm</span>
-                  : <span className="text-slate-600">Mahsulot tanlang...</span>
+                  : <span className="text-slate-600 text-xs">Mahsulot tanlang...</span>
                 }
               </div>
             </div>
           </div>
-
-          {/* Mahsulot tafsiloti preview */}
           {debtForm.product_id && debtForm.amount > 0 && (() => {
             const prod = products.find(p => String(p.id) === String(debtForm.product_id))
             return (
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">{prod?.name}</span>
+                <div className="flex justify-between items-center flex-wrap gap-1">
+                  <span className="text-slate-400 truncate">{prod?.name}</span>
                   <span className="text-rose-300 font-bold">{fmt(prod?.price || 0)} × {debtForm.qty} = {fmt(debtForm.amount)} so'm</span>
                 </div>
               </div>
             )
           })()}
-
-          {/* Telefon raqamlari */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Telefon raqami *</label>
@@ -1642,8 +1776,6 @@ export default function SmartDokon() {
                 onChange={e => setDebtForm(f => ({...f, phone2: e.target.value}))} />
             </div>
           </div>
-
-          {/* Sanalar */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Berilgan sana</label>
@@ -1656,14 +1788,11 @@ export default function SmartDokon() {
                 onChange={e => setDebtForm(f => ({...f, due_date: e.target.value}))} />
             </div>
           </div>
-
-          {/* Eslatma */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Eslatma / Izoh</label>
             <textarea className={`${inp} h-20 resize-y`} placeholder="Qarz sababi yoki qo'shimcha ma'lumot..."
               value={debtForm.note} onChange={e => setDebtForm(f => ({...f, note: e.target.value}))} />
           </div>
-
           <button onClick={saveDebt} disabled={saving} className="w-full py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saqlanmoqda...' : editDebtItem ? 'Yangilash' : "Qarzni Qo'shish"}
@@ -1692,10 +1821,10 @@ export default function SmartDokon() {
             <div>
               <h3 className="text-white font-bold mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-purple-400" />Profil</h3>
               <div className="bg-slate-900 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-400">Username</span><span className="text-white font-mono">@{profile.username}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Email</span><span className="text-white">{user.email}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Do'kon turi</span><span className="text-white capitalize">{profile.shop_type}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Promo-kod</span><span className="text-blue-400 font-mono">{profile.promo_code || '—'}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-slate-400 flex-shrink-0">Username</span><span className="text-white font-mono truncate">@{profile.username}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-slate-400 flex-shrink-0">Email</span><span className="text-white truncate">{user.email}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-slate-400 flex-shrink-0">Do'kon turi</span><span className="text-white capitalize">{profile.shop_type}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-slate-400 flex-shrink-0">Promo-kod</span><span className="text-blue-400 font-mono">{profile.promo_code || '—'}</span></div>
               </div>
             </div>
           )}

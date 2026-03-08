@@ -567,11 +567,18 @@ export default function SignupPage() {
                     onBlur={() => touch('birth')} />
                 </Field>
 
+                {/* ✅ TUZATILDI: readOnly olib tashlandi, onChange qo'shildi — telefon raqam endi ko'rinadi */}
                 <Field label="Telefon raqam" icon={<Phone className="w-4 h-4" />}
                   valid={v.phone} touched={touched.s3phone}
                   hint={!v.phone && touched.s3phone ? "+998 XX XXX XX XX formatida kiriting" : ""}>
                   <input type="tel" placeholder="+998 90 123 45 67"
-                    className={iCls(v.phone, touched.s3phone)} value={formData.phone} readOnly
+                    className={iCls(v.phone, touched.s3phone)} value={formData.phone}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^\d+]/g, '')
+                      if (raw.length <= 1) { setFormData(f => ({ ...f, phone: '' })); return }
+                      setFormData(f => ({ ...f, phone: formatPhone(raw) }))
+                      touch('s3phone')
+                    }}
                     onBlur={() => touch('s3phone')} />
                 </Field>
 

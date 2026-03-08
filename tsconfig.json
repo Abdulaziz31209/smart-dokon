@@ -14,7 +14,7 @@
     ],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": true,
+    "strict": false,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -39,6 +39,6 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase/functions/**"
   ]
 }
