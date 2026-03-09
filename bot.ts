@@ -1,135 +1,66 @@
 import { Bot } from "grammy";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
-import * as path from "path";
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+dotenv.config();
 
-const { BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY } = process.env;
+const bot = new Bot(process.env.BOT_TOKEN!);
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_KEY!
+);
 
-const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
-const bot = new Bot(BOT_TOKEN!);
-
-// /start komandasi - startCode ni qabul qiladi
 bot.command("start", async (ctx) => {
   try {
-    const telegramId = ctx.from?.id.toString();
+    const telegramId = ctx.from?.id.toString()!;
     const username = ctx.from?.username || "noma'lum";
-    
-    // Start parametridan kodni olish (masalan: /start 123456)
-    const startArgs = ctx.match?.split(" ") || [];
-    const startCode = startArgs[1]; // Foydalanuvchi yuborgan kod
 
-    // Agar kod yuborilgan bo'lsa - tekshirish
-    if (startCode) {
-      // otp_codes jadvalidan kodni izlash
-      const { data: otpRecord, error: otpError } = await supabase
-        .from("otp_codes")
-        .select("*")
-        .eq("code", startCode)
-        .eq("status", "pending")
-        .gte("expires_at", new Date().toISOString())
-        .maybeSingle();
+    // 6 xonali random kod yaratish
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 daqiqa
 
-      if (otpError) throw otpError;
+    // Eski kodlarni bekor qilish
+    await supabase
+      .from("otp_codes")
+      .update({ status: "expired" })
+      .eq("telegram_id", telegramId)
+      .eq("status", "pending");
 
-      if (otpRecord) {
-        // Kod to'g'ri - foydalanuvchini tasdiqlash
-        await supabase
-          .from("otp_codes")
-          .update({ status: "used" })
-          .eq("id", otpRecord.id);
+    // Yangi kodni DB ga saqlash
+    const { error } = await supabase.from("otp_codes").insert({
+      telegram_id: telegramId,
+      telegram_username: username,
+      code,
+      status: "pending",
+      expires_at: expiresAt,
+    });
 
-        // Profilni yangilash
-        await supabase
-          .from("profiles")
-          .upsert({
-            telegram_id: telegramId,
-            telegram_username: username,
-            phone: otpRecord.phone,
-          }, { onConflict: "telegram_id" });
+    if (error) throw error;
 
-        await ctx.reply(
-          `✅ *Tasdiqlash muvaffaqiyatli!*\n\nSiz Smart-Dokon.Ai ga muvaffaqiyatli bog'landingiz.\n\nEndi saytga kirib ro'yxatdan o'tishingiz mumkin.`,
-          { parse_mode: "Markdown" }
-        );
-        
-        console.log(`✅ Foydalanuvchi tasdiqlandi: ${telegramId}, Telefon: ${otpRecord.phone}`);
-        return;
-      } else {
-        // Kod xato yoki muddati o'tgan
-        await ctx.reply(
-          `❌ *Kod xato yoki muddati o'tgan!*\n\nIltimos, saytdan qayta kod oling va uni yuboring.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
-    }
-
-    // Agar kod yuborilmagan bo'lsa - yangi kod so'rash
+    // Foydalanuvchiga kodni yuborish
     await ctx.reply(
-      `👋 *Salom! Smart-Dokon.Ai botiga xush kelibsiz!*\n\nRo'yxatdan o'tish uchun saytdan kod oling va uni menga yuboring.\n\nMasalan: /start 123456`,
-      { parse_mode: "Markdown" }
+      `👋 Salom, @${username}!\n\n` +
+      `🔑 Sizning kirish kodingiz:\n\n` +
+      `<code>${code}</code>\n\n` +
+      `⏱ Kod <b>5 daqiqa</b> amal qiladi.\n` +
+      `🔒 Kodni hech kimga bermang!\n\n` +
+      `➡️ Saytga o'tib shu kodni kiriting.`,
+      { parse_mode: "HTML" }
     );
 
   } catch (err: any) {
     console.error("Xatolik:", err.message);
-    await ctx.reply("⚠️ Kechirasiz, xato yuz berdi. Qayta urinib ko'ring.");
+    await ctx.reply("⚠️ Xatolik yuz berdi. Qaytadan /start bosing.");
   }
 });
 
-// Matnli xabarlarni qabul qilish - foydalanuvchi kodi
-bot.on("message:text", async (ctx) => {
-  try {
-    const telegramId = ctx.from?.id.toString();
-    const username = ctx.from?.username || "noma'lum";
-    const userCode = ctx.message.text.trim();
-
-    // Kodni tekshirish
-    const { data: otpRecord, error: otpError } = await supabase
-      .from("otp_codes")
-      .select("*")
-      .eq("code", userCode)
-      .eq("status", "pending")
-      .gte("expires_at", new Date().toISOString())
-      .maybeSingle();
-
-    if (otpError) throw otpError;
-
-    if (otpRecord) {
-      // Kod to'g'ri - foydalanuvchini tasdiqlash
-      await supabase
-        .from("otp_codes")
-        .update({ status: "used" })
-        .eq("id", otpRecord.id);
-
-      // Profilni yangilash
-      await supabase
-        .from("profiles")
-        .upsert({
-          telegram_id: telegramId,
-          telegram_username: username,
-          phone: otpRecord.phone,
-        }, { onConflict: "telegram_id" });
-
-      await ctx.reply(
-        `✅ *Tasdiqlash muvaffaqiyatli!*\n\nSiz Smart-Dokon.Ai ga muvaffaqiyatli bog'landingiz.\n\nEndi saytga kirib ro'yxatdan o'tishingiz mumkin.`,
-        { parse_mode: "Markdown" }
-      );
-      
-      console.log(`✅ Foydalanuvchi tasdiqlandi: ${telegramId}, Telefon: ${otpRecord.phone}`);
-    } else {
-      // Kod xato
-      await ctx.reply(
-        `❌ *Kod xato yoki muddati o'tgan!*\n\nIltimos, saytdan to'g'ri kodni kiriting.`,
-        { parse_mode: "Markdown" }
-      );
-    }
-  } catch (err: any) {
-    console.error("Xatolik:", err.message);
-    await ctx.reply("⚠️ Xato yuz berdi. Qayta urinib ko'ring.");
-  }
+// Boshqa xabarlar uchun
+bot.on("message", async (ctx) => {
+  await ctx.reply(
+    "Kod olish uchun /start ni bosing 👇",
+    { parse_mode: "HTML" }
+  );
 });
 
+console.log("🚀 Bot ishga tushdi!");
 bot.start();
-
