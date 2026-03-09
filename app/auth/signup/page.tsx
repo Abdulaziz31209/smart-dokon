@@ -57,8 +57,30 @@ function generateUsername(fullName: string, storeName: string, birthDate: string
 }
 
 function formatPhone(v: string): string {
+  // Faqat raqamlarni olib qolamiz
   const d = v.replace(/\D/g, '')
-  const raw = d.startsWith('998') ? d : d.startsWith('0') ? '998' + d.slice(1) : '998' + d
+  
+  // Agar hech narsa kiritilmagan bo'lsa, bo'sh qaytaramiz
+  if (d.length === 0) return ''
+  
+  // Agar 998 bilan boshlansa, o'zgartirmaymiz
+  // Aks holda 998 qo'shamiz (faqat raqam kiritilganidan so'ng)
+  let raw = d
+  if (!d.startsWith('998') && !d.startsWith('0')) {
+    // Faqat birinchi raqam kiritilganda 998 qo'shmaymiz
+    // foydalanuvchi o'zi kiritishiga ruxsat beramiz
+    if (d.length > 0 && d.length <= 2) {
+      raw = d
+    } else if (d.length > 2) {
+      raw = '998' + d
+    }
+  } else if (d.startsWith('0')) {
+    // 0 bilan boshlansa, 998 ga almashlamiz
+    raw = '998' + d.slice(1)
+  } else if (d.startsWith('998')) {
+    raw = d
+  }
+  
   const n = raw.slice(0, 12)
   const parts = ['+998']
   if (n.length > 3)  parts.push(' ' + n.slice(3, 5))

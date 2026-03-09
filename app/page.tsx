@@ -580,9 +580,15 @@ export default function SmartDokon() {
     const selectedProd = products.find(p => String(p.id) === String(debtForm.product_id))
     const selectedEmp  = employees.find(e => String(e.id) === String(debtForm.employee_id))
 
+    // Ombordan kamaytirish uchun tekshirish
+    if (selectedProd && selectedProd.stock < Number(debtForm.qty)) {
+      return showToast(`Omborda faqat ${selectedProd.stock} dona bor!`, 'err')
+    }
+
     setSaving(true)
 
     if (!user) {
+      // Demo rejim uchun
       if (editDebtItem) {
         setDebts(prev => prev.map(d => d.id === editDebtItem.id ? {
           ...d,
@@ -621,38 +627,69 @@ export default function SmartDokon() {
           phone2: debtForm.phone2,
         }])
       }
+      // Demo rejimda ombordan kamaytirish
+      setProducts(prev => prev.map(p => 
+        String(p.id) === String(debtForm.product_id) 
+          ? { ...p, stock: (p.stock || 0) - Number(debtForm.qty) }
+          : p
+      ))
       setSaving(false)
-      showToast(editDebtItem ? 'Qarz yangilandi!' : 'Qarz qo\'shildi!')
+      showToast(editDebtItem ? 'Qarz yangilandi!' : 'Qarz qo\'shildi! (Ombordan kamaytirildi)')
       setModal(null)
       return
     }
 
-    const payload = {
-      customer: debtForm.customer,
-      product_id: debtForm.product_id || null,
-      product_name: selectedProd?.name || '',
-      qty: Number(debtForm.qty),
-      amount: amt,
-      paid: editDebtItem ? (editDebtItem.paid || 0) : 0,
-      remaining: amt - (editDebtItem ? (editDebtItem.paid || 0) : 0),
-      due_date: debtForm.due_date,
-      give_date: debtForm.give_date,
-      note: debtForm.note,
-      user_id: user.id,
-      status: 'active',
-      employee_id: debtForm.employee_id || null,
-      employee_name: selectedEmp?.name || '',
-      phone: debtForm.phone,
-      phone2: debtForm.phone2,
+    // Real rejim - Supabase bilan ishlash
+    try {
+      // 1. Ombordan mahsulotni kamaytirish
+      if (selectedProd) {
+        const newStock = selectedProd.stock - Number(debtForm.qty)
+        await supabase.from('products').update({ stock: newStock }).eq('id', selectedProd.id)
+        
+        // Inventory log yaratish
+        await supabase.from('inventory_logs').insert([{
+          user_id: user.id,
+          product_id: selectedProd.id,
+          change: -Number(debtForm.qty),
+          new_stock: newStock,
+          type: 'stock_out',
+          reason: `Qarzga berildi: ${debtForm.customer}`,
+        }])
+      }
+
+      // 2. Debt yozuvini saqlash
+      const payload = {
+        customer: debtForm.customer,
+        product_id: debtForm.product_id || null,
+        product_name: selectedProd?.name || '',
+        qty: Number(debtForm.qty),
+        amount: amt,
+        paid: editDebtItem ? (editDebtItem.paid || 0) : 0,
+        remaining: amt - (editDebtItem ? (editDebtItem.paid || 0) : 0),
+        due_date: debtForm.due_date,
+        give_date: debtForm.give_date,
+        note: debtForm.note,
+        user_id: user.id,
+        status: 'active',
+        employee_id: debtForm.employee_id || null,
+        employee_name: selectedEmp?.name || '',
+        phone: debtForm.phone,
+        phone2: debtForm.phone2,
+      }
+      
+      if (editDebtItem) {
+        await supabase.from('debts').update(payload).eq('id', editDebtItem.id)
+      } else {
+        await supabase.from('debts').insert([payload])
+      }
+
+      showToast(editDebtItem ? 'Qarz yangilandi!' : 'Qarz qo\'shildi! (Ombordan kamaytirildi)')
+      setModal(null)
+      await Promise.all([fetchProducts(), fetchDebts()])
+    } catch (error: any) {
+      showToast('Xatolik: ' + error.message, 'err')
     }
-    const { error } = editDebtItem
-      ? await supabase.from('debts').update(payload).eq('id', editDebtItem.id)
-      : await supabase.from('debts').insert([payload])
     setSaving(false)
-    if (error) return showToast('Xatolik: ' + error.message, 'err')
-    showToast(editDebtItem ? 'Qarz yangilandi!' : 'Qarz qo\'shildi!')
-    setModal(null)
-    fetchDebts()
   }
 
   const deleteDebt = async (id: any) => {
@@ -868,7 +905,18 @@ export default function SmartDokon() {
               <h1 className="text-base sm:text-xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent leading-tight">
                 {user && profile?.shop_name ? profile.shop_name : 'Aqlli-Dokon'}
               </h1>
-              <p className="text-slate-500 text-[10px] sm:text-xs">{user ? `@${profile?.username || ''}` : 'Demo rejim'}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-slate-500 text-[10px] sm:text-xs">{user ? `@${profile?.username || ''}` : 'Demo rejim'}</p>
+                {user && profile?.phone && (
+                  <>
+                    <span className="text-slate-600 text-[8px]">•</span>
+                    <a href={`tel:${profile.phone}`} className="text-blue-400 hover:text-blue-300 text-[10px] sm:text-xs font-medium flex items-center gap-1 transition-colors">
+                      <Phone className="w-3 h-3" />
+                      <span className="hidden xs:inline">{profile.phone}</span>
+                    </a>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Period (o'rta) */}
