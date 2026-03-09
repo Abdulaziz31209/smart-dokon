@@ -1,14 +1,9 @@
+// @ts-nocheck
 // supabase/functions/telegram-webhook/index.ts
-// Bu funksiya Telegram botdan kelgan /start CODE xabarini qabul qiladi
-// va foydalanuvchiga kodni yuboradi.
-//
-// Telegram webhook URL ni o'rnatish:
-// https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<project>.supabase.co/functions/v1/telegram-webhook
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-serve(async (req) => {
+serve(async (req: Request) => {
   try {
     const body = await req.json()
     const message = body?.message
@@ -18,7 +13,6 @@ serve(async (req) => {
     const text    = message.text?.trim() ?? ''
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')!
 
-    // /start CODE formatini tekshirish
     const startMatch = text.match(/^\/start\s+(\d{6})$/)
 
     if (!startMatch) {
@@ -35,7 +29,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Kodni DB dan topish
     const { data: otpRow, error } = await supabase
       .from('otp_codes')
       .select('*')
@@ -51,7 +44,6 @@ serve(async (req) => {
       return new Response('ok')
     }
 
-    // Kod topildi — foydalanuvchiga yuborish
     await sendTelegram(botToken, chatId,
       `✅ Asalomu alaykum!\n\nMana sizning kodingiz:\n\n` +
       `<code>${code}</code>\n\n` +
