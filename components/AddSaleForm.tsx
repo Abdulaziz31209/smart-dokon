@@ -10,6 +10,9 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
   const [products, setProducts] = useState<any[]>([])
   const [selectedProductId, setSelectedProductId] = useState<string>('')
   const [quantity, setQuantity] = useState(1)
+  const [isNasiya, setIsNasiya] = useState(false)
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
 
   // Fetch products when modal opens
   useEffect(() => {
@@ -39,27 +42,73 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Avtorizatsiyadan o\'tilmagan')
 
-      // Call the server-side RPC function for atomic transaction
-      const { error } = await supabase.rpc('record_sale', {
-        p_business_id: selectedProduct.business_id,
-        p_employee_id: user.id,
-        p_total_amount: selectedProduct.price * quantity,
-        p_payment_method: 'cash',
-        p_product_id: selectedProduct.id,
-        p_quantity: quantity,
-        p_unit_price: selectedProduct.price,
-        p_unit_cost: selectedProduct.cost_price
-      })
+      // Direct insert using schema + triggers (RPC update recommended)
+      // 1. Upsert employee (current user)
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .upsert({ user_id: user.id, full_name: user.user_metadata?.full_name || user.email.split('@')[0], is_active: true }, { onConflict: 'user_id' })
+        .select('id')
+        .single()
 
-      if (error) throw error
+      const employeeId = employeeData?.id
+
+      // 2. Upsert customer if Nasiya
+      let customerId: number | null = null
+      if (isNasiya && customerName) {
+        const customerDetails = { name: customerName, phone: customerPhone || null }
+        const { data: customerData } = await supabase
+          .from('customers')
+          .upsert({ 
+            user_id: user.id, 
+            full_name: customerName, 
+            phone: customerPhone, 
+            customer_details: customerDetails 
+          }, { onConflict: 'user_id,full_name' })
+          .select('id')
+          .single()
+        customerId = customerData?.id
+      }
+
+      // 3. Insert sale
+      const paymentType = isNasiya ? 'debt' : 'cash'
+      const paymentStatus = isNasiya ? 'unpaid' : 'paid'
+      const { data: saleData, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          user_id: user.id,
+          employee_id: employeeId,
+          customer_id: customerId || null,
+          total_price: parseFloat(total),
+          payment_method: paymentType,
+          payment_status: paymentStatus,
+          customer_details: isNasiya ? { name: customerName, phone: customerPhone } : {}
+        })
+        .select('id')
+        .single()
+      if (saleError) throw saleError
+
+      // 4. Insert sale_item
+      const { error: itemError } = await supabase
+        .from('sale_items')
+        .insert({
+          sale_id: saleData.id,
+          product_id: selectedProductId,
+          quantity,
+          unit_price: selectedProduct.price,
+          total_price: parseFloat(total)
+        })
+      if (itemError) throw itemError
 
       onSaleComplete()
       setIsOpen(false)
       setQuantity(1)
       setSelectedProductId('')
+      setIsNasiya(false)
+      setCustomerName('')
+      setCustomerPhone('')
       
     } catch (error: any) {
-      alert('Xatolik: ' + error.message)
+      alert('Xatolik: ' + (error.message || error))
     } finally {
       setLoading(false)
     }
@@ -110,6 +159,47 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
             </select>
           </div>
 
+          {/* Nasiya Toggle */}
+          <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setIsNasiya(!isNasiya)}
+              className={`flex-1 p-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
+                isNasiya 
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25' 
+                  : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+              }`}
+            >
+              {isNasiya ? '❌ Naqd' : '💳 Nasiya'}
+            </button>
+            {isNasiya && (
+              <div className="text-xs text-orange-400 font-bold bg-orange-500/20 px-3 py-1 rounded-full border border-orange-500/30">
+                QARZ
+              </div>
+            )}
+          </div>
+
+          {isNasiya && (
+            <div className="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-orange-800/50">
+              <label className="block text-orange-400 text-sm mb-2 font-bold">Mijoz ma'lumotlari (majburiy)</label>
+              <input
+                required
+                type="text"
+                placeholder="Ism"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full bg-slate-900 border border-orange-500/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-400 transition-colors"
+              />
+              <input
+                type="tel"
+                placeholder="Telefon (ixtiyoriy)"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-400 transition-colors"
+              />
+            </div>
+          )}
+
           {selectedProduct && (
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
               <div className="flex justify-between items-center mb-4">
@@ -136,23 +226,31 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
             </div>
           )}
 
-          <div className="flex justify-between items-center py-4 border-t border-slate-800">
+          <div className="flex justify-between items-center py-4 border-t border-slate-800 bg-gradient-to-r ${
+            isNasiya ? 'from-orange-500/10' : 'from-emerald-500/10'
+          }">
             <span className="text-lg text-slate-400">Jami Summa:</span>
-            <span className="text-3xl font-bold text-emerald-400">${total}</span>
+            <span className={`text-3xl font-bold ${isNasiya ? 'text-orange-400' : 'text-emerald-400'}`}>
+              ${total}
+            </span>
           </div>
 
           <button
             type="submit"
-            disabled={loading || !selectedProduct}
-            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || !selectedProduct || (isNasiya && !customerName)}
+            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-800 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
           >
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" /> Bajarilmoqda...
               </>
+            ) : isNasiya ? (
+              <>
+                <Check className="w-5 h-5" /> Nasiya berish
+              </>
             ) : (
               <>
-                <Check className="w-5 h-5" /> Sotish
+                <Check className="w-5 h-5" /> Naqd sotish
               </>
             )}
           </button>

@@ -1,29 +1,25 @@
-# Telegram Botni Supabase ga ko'chirish - TODO
+# Sales History & Debt System Implementation
+Breakdown of approved plan into steps:
 
-## [x] 1. Migrate webhook logic ✅\nUpdated supabase/functions/telegram-webhook/index.ts - now handles both `/start` (generate OTP) and `/start<code>` (verify code).
+## 1. Locate & Update record_sale RPC [PENDING]
+- List supabase/functions for record_sale
+- Read & update RPC for payment_type, payment_status, customer_details
 
-## [ ] 2. Disable local polling bot
-- Comment ecosystem.config.js
-- Add note to start-bot.bat
+## 2. DB Schema Updates ✅ COMPLETE
+- Created supabase/migrations/20260225000000_sales_debt_enhancements.sql (payment_status, customer_details, indexes, sales_history VIEW)
+- Run in Supabase SQL Editor
 
-## [ ] 3. Deploy Supabase function
-Run: `npx supabase functions deploy telegram-webhook`
+## 3. Frontend Updates ✅ COMPLETE
+- Created lib/sales.types.ts
+- Updated components/AddSaleForm.tsx with Nasiya toggle, customer input, direct DB inserts (replaces RPC)
+- Created app/sales-history/page.tsx with date presets, table, stats
 
-## [ ] 4. Configure Supabase Edge Function env vars
-Supabase Dashboard > Edge Functions > telegram-webhook > Settings:
-- TELEGRAM_BOT_TOKEN=your_bot_token
-- SUPABASE_URL=your_project_url
-- SUPABASE_SERVICE_ROLE_KEY=your_service_role
+## 4. Navigation & Testing ✅ PARTIAL
+- Added Sales History link to Navbar.tsx
+- react-day-picker/date-fns command issued (manual npm i if failed)
+- History page created
 
-## [ ] 5. Set Telegram webhook
-`https://YOUR_PROJECT.supabase.co/functions/v1/telegram-webhook`
+## 5. Optimization [PENDING]
+- Add pagination, realtime
+- Performance indexes
 
-## [ ] 6. Test
-- Send /start to bot
-- Generate OTP on signup page, open link
-- Verify no local server needed
-
-## [ ] 7. Cleanup
-Stop PM2, remove local bot if not needed.
-
-Progress: Starting step 1...
