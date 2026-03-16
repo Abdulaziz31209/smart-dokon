@@ -1,1 +1,13 @@
-# Fix html5-qrcode TS Error\n\n- [x] Install html5-qrcode\n- [x] Create custom types (types/html5-qrcode.d.ts)\n- [x] Update tsconfig.json to include ./types\n- [ ] Restart TS Server: Ctrl+Shift+P → \"TypeScript: Restart TS Server\"\n- [ ] Check useBarcodeScanner.ts has no error\n\nTask ready after restart.
+# Task: Make Sales + Barcode Scanner + Sales History visible on mobile/desktop
+
+## Plan Steps:
+1. [ ] ✅ Read main files (page.tsx, Navbar.tsx, layout.tsx, sales pages)
+2. [ ] Add 'Sotuv' and 'Sotuv Tarixi' tabs to app/page.tsx dashboard nav
+3. [ ] Update components/Navbar.tsx - make sales-history always visible + add Sales link for mobile
+4. [ ] Verify app/sales/page.tsx integrates BarcodeScanner properly  
+5. [ ] Test locally: cd smart-dokon/smart-bi-os && npm run dev
+6. [ ] Test PWA on phone - verify new tabs/links visible
+7. [ ] [DONE] attempt_completion
+
+**Progress: Understanding phase complete. Ready for edits.**
+

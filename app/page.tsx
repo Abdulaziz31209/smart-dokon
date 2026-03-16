@@ -950,7 +950,8 @@ export default function SmartDokon() {
               { k: 'bugun',      icon: <Home       className="w-3.5 h-3.5" />, l: 'Bosh'     },
               { k: 'ombor',      icon: <Package    className="w-3.5 h-3.5" />, l: 'Ombor'    },
               { k: 'xodimlar',   icon: <Users      className="w-3.5 h-3.5" />, l: 'Xodimlar' },
-              { k: 'hisobotlar', icon: <FileText   className="w-3.5 h-3.5" />, l: 'Hisobot'  },
+  { k: 'hisobotlar', icon: <FileText   className="w-3.5 h-3.5" />, l: 'Hisobot'  },
+              { k: 'sotuv',     icon: <ShoppingCart className="w-3.5 h-3.5" />, l: 'Sotuv'   },
               { k: 'qarzlar',    icon: <CreditCard className="w-3.5 h-3.5" />, l: 'Qarzlar'  },
             ].map(it => (
               <button key={it.k} onClick={() => setView(it.k)}
