@@ -73,7 +73,7 @@ export default function SalesHistoryPage() {
       <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent mb-2">
-            Sales History
+            Sotuv Tarixi
           </h1>
           <p className="text-slate-400">Global date filter. Accurate data isolation by timestamp.</p>
         </div>

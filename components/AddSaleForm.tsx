@@ -1,49 +1,40 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Product, CustomerDetails } from '@/lib/sales.types'
 import { ShoppingCart, X, Loader2, Check } from 'lucide-react'
 
-export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => void }) {
+interface CartItem {
+  product: Product
+  quantity: number
+}
+
+interface AddSaleFormProps {
+  cart: CartItem[]
+  total: number
+  onSaleComplete: () => void
+}
+
+export default function AddSaleForm({ cart, total, onSaleComplete }: AddSaleFormProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
-  const [selectedProductId, setSelectedProductId] = useState<string>('')
-  const [quantity, setQuantity] = useState(1)
   const [isNasiya, setIsNasiya] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
 
-  // Fetch products when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      const fetchProducts = async () => {
-        const { data } = await supabase
-          .from('products')
-          .select('*')
-          .gt('stock', 0) // Only show in-stock items
-          .order('name')
-        
-        if (data) setProducts(data)
-      }
-      fetchProducts()
-    }
-  }, [isOpen])
 
-  const selectedProduct = products.find(p => p.id === selectedProductId)
-  const total = selectedProduct ? (selectedProduct.price * quantity).toFixed(2) : '0.00'
 
   const handleSale = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedProduct) return
+    if (cart.length === 0) return
     
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Avtorizatsiyadan o\'tilmagan')
 
-      // Direct insert using schema + triggers (RPC update recommended)
-      // 1. Upsert employee (current user)
+      // 1. Upsert employee
       const { data: employeeData } = await supabase
         .from('employees')
         .upsert({ user_id: user.id, full_name: user.user_metadata?.full_name || user.email.split('@')[0], is_active: true }, { onConflict: 'user_id' })
@@ -55,7 +46,7 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
       // 2. Upsert customer if Nasiya
       let customerId: number | null = null
       if (isNasiya && customerName) {
-        const customerDetails = { name: customerName, phone: customerPhone || null }
+        const customerDetails = { name: customerName, phone: customerPhone || null } as CustomerDetails
         const { data: customerData } = await supabase
           .from('customers')
           .upsert({ 
@@ -69,7 +60,7 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
         customerId = customerData?.id
       }
 
-      // 3. Insert sale
+      // 3. Insert sale (batch total)
       const paymentType = isNasiya ? 'debt' : 'cash'
       const paymentStatus = isNasiya ? 'unpaid' : 'paid'
       const { data: saleData, error: saleError } = await supabase
@@ -78,7 +69,7 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
           user_id: user.id,
           employee_id: employeeId,
           customer_id: customerId || null,
-          total_price: parseFloat(total),
+          total_price: total,
           payment_method: paymentType,
           payment_status: paymentStatus,
           customer_details: isNasiya ? { name: customerName, phone: customerPhone } : {}
@@ -87,22 +78,22 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
         .single()
       if (saleError) throw saleError
 
-      // 4. Insert sale_item
-      const { error: itemError } = await supabase
+      // 4. Batch insert sale_items
+      const saleItems = cart.map(item => ({
+        sale_id: saleData.id,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        total_price: item.product.price * item.quantity
+      }));
+      
+      const { error: itemsError } = await supabase
         .from('sale_items')
-        .insert({
-          sale_id: saleData.id,
-          product_id: selectedProductId,
-          quantity,
-          unit_price: selectedProduct.price,
-          total_price: parseFloat(total)
-        })
-      if (itemError) throw itemError
+        .insert(saleItems);
+      if (itemsError) throw itemsError
 
       onSaleComplete()
       setIsOpen(false)
-      setQuantity(1)
-      setSelectedProductId('')
       setIsNasiya(false)
       setCustomerName('')
       setCustomerPhone('')
@@ -142,22 +133,22 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
         </h2>
         
         <form onSubmit={handleSale} className="space-y-6">
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">Mahsulotni Tanlang</label>
-            <select
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors appearance-none"
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-            >
-              <option value="">Tanlang...</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — ${p.price} ({p.stock} ta qoldi)
-                </option>
+          {cart.length === 0 ? (
+            <div className="text-center py-12 bg-slate-950/50 border-2 border-dashed border-slate-700 rounded-2xl">
+              <ShoppingCart className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+              <p className="text-slate-400">Savat bo\'sh. Shtrix-kod skanerlang!</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-400">Savatdagi mahsulotlar:</p>
+              {cart.map(item => (
+                <div key={item.product.id} className="flex justify-between items-center p-3 bg-slate-800/50 rounded-xl">
+                  <span>{item.product.name} × {item.quantity}</span>
+                  <span className="font-bold">${(item.product.price * item.quantity).toFixed(2)}</span>
+                </div>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
 
           {/* Nasiya Toggle */}
           <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl">
@@ -200,44 +191,18 @@ export default function AddSaleForm({ onSaleComplete }: { onSaleComplete: () => 
             </div>
           )}
 
-          {selectedProduct && (
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-slate-400">Narxi:</span>
-                <span className="font-bold text-white">${selectedProduct.price}</span>
-              </div>
-              
-              <div>
-                <label className="block text-slate-400 text-sm mb-2">Soni</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="number"
-                    min="1"
-                    max={selectedProduct.stock}
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
-                  <span className="text-slate-500 text-sm whitespace-nowrap">
-                    max: {selectedProduct.stock}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-between items-center py-4 border-t border-slate-800 bg-gradient-to-r ${
             isNasiya ? 'from-orange-500/10' : 'from-emerald-500/10'
           }">
             <span className="text-lg text-slate-400">Jami Summa:</span>
             <span className={`text-3xl font-bold ${isNasiya ? 'text-orange-400' : 'text-emerald-400'}`}>
-              ${total}
+              ${total.toFixed(2)}
             </span>
           </div>
 
           <button
             type="submit"
-            disabled={loading || !selectedProduct || (isNasiya && !customerName)}
+            disabled={loading || cart.length === 0 || (isNasiya && !customerName)}
             className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-800 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
           >
             {loading ? (

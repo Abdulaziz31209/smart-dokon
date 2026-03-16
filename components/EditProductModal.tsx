@@ -8,6 +8,7 @@ interface Product {
   id: string
   name: string
   sku: string
+  barcode?: string
   price: number
   cost_price: number
   stock: number
@@ -82,6 +83,14 @@ if (user) {
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-slate-400 text-sm mb-1 font-bold">Shtrix-kod</label>
+            <input
+              type="text"
+              placeholder="Barcode (ixtiyoriy)"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors mb-4"
+              value={formData.barcode || ''}
+              onChange={e => setFormData({...formData, barcode: e.target.value})}
+            />
             <label className="block text-slate-400 text-sm mb-1">Mahsulot Nomi</label>
             <input
               required

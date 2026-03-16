@@ -4,6 +4,22 @@ export interface CustomerDetails {
   address?: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  price: number;
+  cost_price: number;
+  stock: number;
+  min_stock_level: number;
+  product_metadata?: {
+    image_url?: string;
+    description?: string;
+    brand?: string;
+  };
+}
+
 export interface SalesRow {
   id: string;
   date: string;

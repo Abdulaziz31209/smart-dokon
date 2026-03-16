@@ -93,7 +93,7 @@ export default function Navbar() {
               </span>
             </div>
             <Link href="/sales-history" className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-sm font-bold border border-emerald-500/30 transition-all whitespace-nowrap hidden md:block">
-              📊 Sales History
+              📊Sotuv Tarixi
             </Link>
             
             <button 
