@@ -1,42 +1,5 @@
 {
-  "name": "smart-bi-os",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "bot": "tsx bot.ts"
-  },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.98.0",
-    "@tailwindcss/postcss": "^4.1.18",
-    "clsx": "^2.1.1",
-    "dotenv": "^17.3.1",
-    "grammy": "^1.41.1",
-    "groq-sdk": "^0.37.0",
-    "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.474.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-server-dom-webpack": "^19.2.4",
-    "recharts": "^2.15.1",
-    "tailwind-merge": "^3.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.17.16",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
-    "@types/recharts": "^1.8.29",
-    "autoprefixer": "^10.4.24",
-    "eslint": "^10.0.2",
-    "next": "^16.1.6",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.3"
+    "html5-qrcode": "^2.3.8"
   }
 }

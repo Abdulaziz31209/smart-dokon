@@ -92,12 +92,8 @@ export default function Navbar() {
                 {user.email}
               </span>
             </div>
-            <Link href="/sales-history" className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-sm font-bold border border-emerald-500/30 transition-all whitespace-nowrap">
-              📊 Sotuv Tarixi
-            </Link>
-            <Link href="/sales" className="px-4 py-2 bg-blue-600/20 hover:bg-blue-500/20 text-blue-400 rounded-xl text-sm font-bold border border-blue-500/30 transition-all whitespace-nowrap">
-              🛒 Sotuv
-            </Link>
+
+
             
             <button 
               onClick={() => {

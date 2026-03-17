@@ -48,9 +48,25 @@ export function useBarcodeScanner({ onScan }: UseBarcodeScannerProps) {
     try {
       scannerRef.current = new Html5QrcodeScanner(
         'scanner-reader',
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          disableFlip: false,
+          rememberLastUsedCamera: true,
+          // supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // types missing
+        },
         false
       );
+      
+      // Permission check
+      if ('mediaDevices' in navigator.mediaDevices || navigator.mediaDevices.getUserMedia) {
+        console.log('Camera supported');
+      } else {
+        console.error('Camera not supported');
+        onScan({ barcode: 'CAMERA_NOT_SUPPORTED', source: 'camera' as any });
+        return;
+      }
 
       scannerRef.current.render(
         (decodedText) => {

@@ -40,10 +40,20 @@ export default function BarcodeScanner({
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Shtrix-kodni ushbu ramkaga joylashtiring</h2>
             <p className="text-slate-400 text-sm mb-4">USB skaner yoki kamera ishlatishingiz mumkin</p>
-            <div 
-              id="scanner-reader" 
-              className="w-80 h-64 bg-slate-900 border-4 border-dashed border-emerald-500 rounded-2xl shadow-2xl mx-auto relative overflow-hidden"
-            />
+            <div className="relative">
+              <div 
+                id="scanner-reader" 
+                className="w-80 h-64 bg-slate-900 border-4 border-dashed border-emerald-500 rounded-2xl shadow-2xl mx-auto relative overflow-hidden"
+              />
+              {scannerActive && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent rounded-2xl pointer-events-none">
+                  <div className="absolute top-12 left-1/2 -translate-x-1/2 w-48 h-48 border-4 border-emerald-400 rounded-xl animate-pulse" />
+                </div>
+              )}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-center text-xs text-slate-400">
+                HTTPS kerak | Permission bering
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3">

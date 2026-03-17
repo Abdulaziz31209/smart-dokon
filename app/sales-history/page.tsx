@@ -16,7 +16,7 @@ const DATE_PRESETS = [
 ];
 
 export default function SalesHistoryPage() {
-  const [sales, setSales] = useState<SalesRow[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [toDate, setToDate] = useState(new Date());
@@ -39,12 +39,18 @@ export default function SalesHistoryPage() {
     const toStr = toDate.toISOString().split('T')[0];
 
     const { data, error } = await supabase
-      .from("sales_history")
-      .select("*")
-      .gte("date", fromStr)
-      .lte("date", toStr)
-      .order("date", { ascending: false })
-      .limit(1000);
+      .from('sales')
+      .select(`
+        *,
+        sale_items (
+          *,
+          products(name, price)
+        ),
+        employees(name)
+      `)
+      .eq('user_id', user.id)
+      .gte('sale_date', fromStr)
+      .lte('sale_date', toStr)
 
     if (data) {
       setSales(data as SalesRow[]);
